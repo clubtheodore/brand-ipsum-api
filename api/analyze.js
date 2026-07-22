@@ -40,6 +40,7 @@ Retourne uniquement un JSON avec cette structure :
 
 
     return res.status(200).json({
-        brand: JSON.parse(response.output_text)
-    })
-}
+    brand: JSON.parse(
+        response.output_text.replace(/```json|```/g, "").trim()
+    )
+})
