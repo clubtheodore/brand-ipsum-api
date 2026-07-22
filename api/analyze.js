@@ -1,3 +1,10 @@
+import OpenAI from "openai"
+
+const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+})
+
+
 export default async function handler(req, res) {
 
     if (req.method !== "POST") {
@@ -10,17 +17,29 @@ export default async function handler(req, res) {
     const { url } = req.body
 
 
+    const response = await client.responses.create({
+        model: "gpt-4.1-mini",
+        input: `
+Analyse cette marque à partir de son URL :
+
+${url}
+
+Retourne uniquement un JSON avec cette structure :
+
+{
+  "name": "",
+  "iconic": [],
+  "products": [],
+  "people": [],
+  "vocabulary": [],
+  "everyday": [],
+  "tone": []
+}
+        `,
+    })
+
+
     return res.status(200).json({
-        message: "Brand analysis received",
-        url: url,
-        brand: {
-            name: "TEST",
-            iconic: [],
-            products: [],
-            people: [],
-            vocabulary: [],
-            everyday: [],
-            tone: []
-        }
+        brand: JSON.parse(response.output_text)
     })
 }
