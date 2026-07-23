@@ -1,46 +1,71 @@
 import OpenAI from "openai"
 
-const client = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
-
-
 export default async function handler(req, res) {
-
     if (req.method !== "POST") {
         return res.status(405).json({
-            error: "Method not allowed"
+            error: "Method not allowed",
         })
     }
 
+    try {
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(500).json({
+                error: "OPENAI_API_KEY is missing",
+            })
+        }
 
-    const { url } = req.body
+        const { url } = req.body || {}
 
+        if (!url) {
+            return res.status(400).json({
+                error: "URL is required",
+            })
+        }
 
-    const response = await client.responses.create({
-        model: "gpt-4.1-mini",
-        input: `
-Analyse cette marque à partir de son URL :
+        const client = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
+        })
+
+        const response = await client.responses.create({
+            model: "gpt-4.1-mini",
+            input: `
+Analyze the brand associated with this URL:
 
 ${url}
 
-Retourne uniquement un JSON avec cette structure :
+Return only valid JSON with this structure:
 
 {
   "name": "",
   "iconic": [],
   "products": [],
   "people": [],
+  "places": [],
   "vocabulary": [],
   "everyday": [],
   "tone": []
 }
-        `,
-    })
+`,
+        })
 
+        const raw = response.output_text
+            .replace(/```json/g, "")
+            .replace(/```/g, "")
+            .trim()
 
-    return res.status(200).json({
-    brand: JSON.parse(
-        response.output_text.replace(/```json|```/g, "").trim()
-    )
-})
+        const brand = JSON.parse(raw)
+
+        return res.status(200).json({
+            brand,
+        })
+    } catch (error) {
+        console.error("Brand Ipsum API error:", error)
+
+        return res.status(500).json({
+            error:
+                error instanceof Error
+                    ? error.message
+                    : "Unknown server error",
+        })
+    }
+}
