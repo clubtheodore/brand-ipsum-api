@@ -113,7 +113,6 @@ function getPathDepth(url) {
     } catch {
         return 99
     }
-}   }
 }
 
 function scoreEvergreenUrl(url) {
