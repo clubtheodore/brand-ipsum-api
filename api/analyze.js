@@ -408,78 +408,55 @@ function selectEvergreenPages(
     )
 }
 
-async function mapWebsite(url) {
-    const maxAttempts = 3
+async function searchEvergreenPages(hostname) {
+    const response = await fetch(
+        "https://api.firecrawl.dev/v2/search",
+        {
+            method: "POST",
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const response = await fetch(
-            "https://api.firecrawl.dev/v2/map",
-            {
-                method: "POST",
+            headers: {
+                Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+                "Content-Type": "application/json",
+            },
 
-                headers: {
-                    Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
-                    "Content-Type": "application/json",
-                },
+            body: JSON.stringify({
+                query:
+                    "about company history heritage mission values vision our business how we work brand",
 
-                body: JSON.stringify({
-                    url,
+                sources: ["web"],
 
-                    search:
-                        "about company history heritage mission values vision our business how we work brand",
+                includeDomains: [hostname],
 
-                    sitemap: "include",
-                    includeSubdomains: true,
-                    ignoreQueryParameters: true,
+                limit: 10,
 
-                    limit: 200,
+                ignoreInvalidURLs: true,
 
-                    timeout: 30000,
-                }),
-            }
-        )
-
-        const rawText = await response.text()
-
-        let data = null
-
-        try {
-            data = JSON.parse(rawText)
-        } catch {
-            // Firecrawl peut parfois renvoyer
-            // un 502/503/504 en texte brut.
+                timeout: 30000,
+            }),
         }
+    )
 
-        if (response.ok && data?.success) {
-            return data.links || []
-        }
+    const rawText = await response.text()
 
-        const retryable =
-            response.status === 502 ||
-            response.status === 503 ||
-            response.status === 504
+    let data = null
 
-        if (retryable && attempt < maxAttempts) {
-            console.warn(
-                `Firecrawl map attempt ${attempt} failed with ${response.status}. Retrying...`
-            )
-
-            await new Promise((resolve) =>
-                setTimeout(resolve, 800 * attempt)
-            )
-
-            continue
-        }
-
+    try {
+        data = JSON.parse(rawText)
+    } catch {
         throw new Error(
-            data?.error ||
-                `Firecrawl map failed (${response.status}): ${rawText.slice(0, 200)}`
+            `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
         )
     }
 
-    return []
-}
+    if (!response.ok || !data?.success) {
+        throw new Error(
+            data?.error ||
+                `Firecrawl search failed (${response.status})`
+        )
+    }
 
+    return data.data?.web || []
+}
 async function scrapePage(
     url,
     includeLinks = false
@@ -969,7 +946,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-5:${hostname}`
+    `brand-ipsum:v3-6:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1049,26 +1026,26 @@ let mappedLinksCount = 0
 // Si la homepage ne révèle aucune bonne page evergreen,
 // on utilise la carte du site comme fallback.
 if (extraUrls.length === 0) {
-    discoverySource = "map"
+    discoverySource = "search"
 
     try {
-        const mappedLinks =
-            await mapWebsite(homepageUrl)
+        const searchResults =
+            await searchEvergreenPages(hostname)
 
         mappedLinksCount =
-            mappedLinks.length
+            searchResults.length
 
         extraUrls =
             selectEvergreenPages(
-                mappedLinks,
+                searchResults,
                 hostname,
                 homepageUrl
             )
     } catch (error) {
-        discoverySource = "map-error"
+        discoverySource = "search-error"
 
         console.error(
-            "Firecrawl map fallback failed:",
+            "Firecrawl search fallback failed:",
             error
         )
     }
