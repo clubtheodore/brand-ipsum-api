@@ -1005,6 +1005,9 @@ export default async function handler(
         // 3. CHOIX DES PAGES EVERGREEN
         // --------------------------------
 
+let discoverySource = "homepage"
+let mappedLinksCount = 0
+        
         let extraUrls =
     selectEvergreenPages(
         homepage.links,
@@ -1018,6 +1021,9 @@ if (extraUrls.length === 0) {
     try {
         const mappedLinks =
             await mapWebsite(homepageUrl)
+
+        mappedLinksCount = mappedLinks.length
+        discoverySource = "map"
 
         extraUrls =
             selectEvergreenPages(
