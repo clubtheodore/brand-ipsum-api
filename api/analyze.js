@@ -408,6 +408,39 @@ function selectEvergreenPages(
     )
 }
 
+async function mapWebsite(url) {
+    const response = await fetch(
+        "https://api.firecrawl.dev/v2/map",
+        {
+            method: "POST",
+
+            headers: {
+                Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+                "Content-Type": "application/json",
+            },
+
+            body: JSON.stringify({
+                url,
+                sitemap: "include",
+                includeSubdomains: true,
+                ignoreQueryParameters: true,
+                limit: 500,
+                timeout: 30000,
+            }),
+        }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok || !data.success) {
+        throw new Error(
+            data.error || `Firecrawl map failed for ${url}`
+        )
+    }
+
+    return data.links || []
+}
+
 async function scrapePage(
     url,
     includeLinks = false
@@ -964,12 +997,33 @@ export default async function handler(
         // 3. CHOIX DES PAGES EVERGREEN
         // --------------------------------
 
-        const extraUrls =
+        let extraUrls =
+    selectEvergreenPages(
+        homepage.links,
+        hostname,
+        homepageUrl
+    )
+
+// Si la homepage ne révèle aucune bonne page evergreen,
+// on utilise la carte du site comme fallback.
+if (extraUrls.length === 0) {
+    try {
+        const mappedLinks =
+            await mapWebsite(homepageUrl)
+
+        extraUrls =
             selectEvergreenPages(
-                homepage.links,
+                mappedLinks,
                 hostname,
                 homepageUrl
             )
+    } catch (error) {
+        console.error(
+            "Firecrawl map fallback failed:",
+            error
+        )
+    }
+}
 
         // --------------------------------
         // 4. SCRAPE MAX 2 PAGES
