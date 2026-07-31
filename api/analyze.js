@@ -2,18 +2,32 @@ import OpenAI from "openai"
 import { Redis } from "@upstash/redis"
 
 const CACHE_TTL_SECONDS = 60 * 60 * 24 * 7
+
+const FIRECRAWL_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7
+
+const MAX_HOME_CHARS = 5000
+const MAX_EXTRA_PAGE_CHARS = 4500
 const MAX_EXTRA_PAGES = 2
-const MAX_CHARS_PER_PAGE = 7500
+
+const MIN_EXTRA_PAGE_SCORE = 12
 
 const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 })
 
+const redisUrl =
+    process.env.KV_REST_API_URL ||
+    process.env.UPSTASH_REDIS_REST_URL
+
+const redisToken =
+    process.env.KV_REST_API_TOKEN ||
+    process.env.UPSTASH_REDIS_REST_TOKEN
+
 const redis =
-    process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+    redisUrl && redisToken
         ? new Redis({
-              url: process.env.KV_REST_API_URL,
-              token: process.env.KV_REST_API_TOKEN,
+              url: redisUrl,
+              token: redisToken,
           })
         : null
 
@@ -24,154 +38,372 @@ function normalizeUrl(input) {
         value = `https://${value}`
     }
 
-    return new URL(value)
+    const parsed = new URL(value)
+
+    if (
+        parsed.protocol !== "http:" &&
+        parsed.protocol !== "https:"
+    ) {
+        throw new Error("Unsupported URL protocol")
+    }
+
+    return parsed
 }
 
 function normalizeHostname(hostname) {
-    return hostname.toLowerCase().replace(/^www\./, "")
+    return hostname
+        .toLowerCase()
+        .replace(/^www\./, "")
 }
 
 function sameDomain(url, hostname) {
     try {
-        return normalizeHostname(new URL(url).hostname) === hostname
+        return (
+            normalizeHostname(new URL(url).hostname) ===
+            hostname
+        )
     } catch {
         return false
     }
 }
 
-function scoreEvergreenUrl(url) {
-    const value = url.toLowerCase()
+function pathContains(pathname, term) {
+    const escaped = term.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&"
+    )
 
-    // Très intéressantes pour comprendre durablement la marque
-    const highPriority = [
-        "about",
-        "about-us",
-        "our-story",
-        "story",
-        "history",
-        "heritage",
-        "mission",
-        "values",
-        "philosophy",
-        "manifesto",
-        "company",
-        "who-we-are",
-        "maison",
-        "savoir-faire",
-        "craft",
-        "craftsmanship",
-        "editorial-principles",
-        "editorial",
-    ]
+    const regex = new RegExp(
+        `(?:^|[\\/_-])${escaped}(?:[\\/_-]|$)`,
+        "i"
+    )
 
-    // Intéressantes pour comprendre l'offre fondamentale
-    const mediumPriority = [
-        "products",
-        "product",
-        "services",
-        "platform",
-        "solutions",
-        "collections",
-        "collection",
-        "technology",
-        "design",
-    ]
-
-    // Contenu très temporaire ou peu utile pour Brand Ipsum
-    const negative = [
-        "sale",
-        "discount",
-        "offers",
-        "new-arrivals",
-        "new-in",
-        "latest",
-        "news",
-        "blog",
-        "article",
-        "press",
-        "login",
-        "signin",
-        "account",
-        "cart",
-        "checkout",
-        "privacy",
-        "terms",
-        "legal",
-        "cookie",
-        "contact",
-        "careers",
-        "jobs",
-    ]
-
-    let score = 0
-
-    for (const word of highPriority) {
-        if (value.includes(word)) score += 10
-    }
-
-    for (const word of mediumPriority) {
-        if (value.includes(word)) score += 4
-    }
-
-    for (const word of negative) {
-        if (value.includes(word)) score -= 8
-    }
-
-    return score
+    return regex.test(pathname)
 }
 
-function selectEvergreenPages(links, hostname, homepageUrl) {
-    const home = homepageUrl.replace(/\/$/, "")
+function getPathDepth(url) {
+    try {
+        return new URL(url).pathname
+            .split("/")
+            .filter(Boolean).length
+    } catch {
+        return 99
+    }
+}
 
-    const cleanLinks = links
+function scoreEvergreenUrl(url) {
+    let parsed
+
+    try {
+        parsed = new URL(url)
+    } catch {
+        return {
+            score: -999,
+            kind: "other",
+        }
+    }
+
+    const path = parsed.pathname.toLowerCase()
+
+    // Pages que l'on ne veut presque jamais utiliser
+    const hardNegativePatterns = [
+        "/stories/",
+        "/story/",
+        "/blog/",
+        "/blogs/",
+        "/article/",
+        "/articles/",
+        "/news/",
+        "/latest/",
+        "/press/",
+        "/guide/",
+        "/guides/",
+        "/use-case/",
+        "/use-cases/",
+        "/case-study/",
+        "/case-studies/",
+        "/shop/",
+        "/collection/",
+        "/collections/",
+        "/category/",
+        "/categories/",
+        "/sale/",
+        "/offers/",
+        "/new-arrivals/",
+        "/search/",
+        "/login/",
+        "/signin/",
+        "/account/",
+        "/cart/",
+        "/checkout/",
+        "/privacy/",
+        "/terms/",
+        "/legal/",
+        "/cookies/",
+        "/careers/",
+        "/jobs/",
+        "/support/",
+        "/help/",
+    ]
+
+    if (
+        hardNegativePatterns.some((pattern) =>
+            path.includes(pattern)
+        )
+    ) {
+        return {
+            score: -100,
+            kind: "other",
+        }
+    }
+
+    // Les pages type "product-story" sont également temporaires
+    if (
+        path.includes("product-story") ||
+        path.includes("customer-story")
+    ) {
+        return {
+            score: -100,
+            kind: "other",
+        }
+    }
+
+    let score = 0
+    let kind = "other"
+
+    const identityTerms = [
+        ["about-us", 35],
+        ["who-we-are", 35],
+        ["our-history", 35],
+        ["our-story", 32],
+        ["heritage", 30],
+        ["history", 28],
+        ["mission", 28],
+        ["company", 26],
+        ["values", 24],
+        ["manifesto", 24],
+        ["philosophy", 22],
+        ["craftsmanship", 24],
+        ["savoir-faire", 24],
+        ["craft", 20],
+        ["purpose", 20],
+        ["ownership", 20],
+        ["our-footprint", 20],
+        ["responsibility", 18],
+        ["sustainability", 18],
+        ["impact", 16],
+        ["editorials", 20],
+        ["editorial", 18],
+        ["about", 24],
+    ]
+
+    for (const [term, points] of identityTerms) {
+        if (pathContains(path, term)) {
+            score += points
+            kind = "identity"
+        }
+    }
+
+    const offeringTerms = [
+        ["products", 18],
+        ["product", 14],
+        ["platform", 18],
+        ["features", 16],
+        ["services", 14],
+        ["solutions", 12],
+        ["technology", 12],
+        ["design", 12],
+    ]
+
+    for (const [term, points] of offeringTerms) {
+        if (pathContains(path, term)) {
+            score += points
+
+            if (kind === "other") {
+                kind = "offering"
+            }
+        }
+    }
+
+    // Pages datées = probablement contenu temporaire
+    if (/\/20\d{2}\//.test(path)) {
+        score -= 18
+    }
+
+    // Slugs de type 260121 / 20260731
+    if (/(?:^|[-_/])\d{6,8}(?:[-_/]|$)/.test(path)) {
+        score -= 15
+    }
+
+    // Plus une page est profonde, plus elle risque
+    // de parler d'un sujet très spécifique
+    const depth = getPathDepth(url)
+
+    if (depth > 2) {
+        score -= (depth - 2) * 5
+    }
+
+    return {
+        score,
+        kind,
+    }
+}
+
+function selectEvergreenPages(
+    links,
+    hostname,
+    homepageUrl
+) {
+    const homepage =
+        homepageUrl.replace(/\/$/, "")
+
+    const candidates = links
         .map((item) => {
-            if (typeof item === "string") return item
-            if (item && typeof item.url === "string") return item.url
+            if (typeof item === "string") {
+                return item
+            }
+
+            if (
+                item &&
+                typeof item.url === "string"
+            ) {
+                return item.url
+            }
+
             return null
         })
         .filter(Boolean)
-        .map((url) => url.split("#")[0])
-        .filter((url) => !url.includes("?"))
-        .filter((url) => sameDomain(url, hostname))
-        .filter((url) => url.replace(/\/$/, "") !== home)
+        .map((url) => {
+            try {
+                const parsed = new URL(url)
 
-    const unique = [...new Set(cleanLinks)]
+                parsed.hash = ""
+                parsed.search = ""
 
-    return unique
-        .map((url) => ({
-            url,
-            score: scoreEvergreenUrl(url),
-        }))
-        .filter((item) => item.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, MAX_EXTRA_PAGES)
-        .map((item) => item.url)
+                return parsed.toString()
+            } catch {
+                return null
+            }
+        })
+        .filter(Boolean)
+        .filter((url) =>
+            sameDomain(url, hostname)
+        )
+        .filter(
+            (url) =>
+                url.replace(/\/$/, "") !==
+                homepage
+        )
+
+    const unique = [...new Set(candidates)]
+
+    const scored = unique
+        .map((url) => {
+            const result =
+                scoreEvergreenUrl(url)
+
+            return {
+                url,
+                score: result.score,
+                kind: result.kind,
+            }
+        })
+        .filter(
+            (item) =>
+                item.score >=
+                MIN_EXTRA_PAGE_SCORE
+        )
+        .sort(
+            (a, b) =>
+                b.score - a.score
+        )
+
+    const selected = []
+
+    // 1. D'abord une page identité
+    const identity = scored.find(
+        (item) =>
+            item.kind === "identity"
+    )
+
+    if (identity) {
+        selected.push(identity)
+    }
+
+    // 2. Puis éventuellement une page produit/core offer
+    const offering = scored.find(
+        (item) =>
+            item.kind === "offering" &&
+            !selected.some(
+                (selectedItem) =>
+                    selectedItem.url === item.url
+            )
+    )
+
+    if (
+        offering &&
+        selected.length < MAX_EXTRA_PAGES
+    ) {
+        selected.push(offering)
+    }
+
+    // 3. Compléter uniquement si une autre page
+    // possède réellement un score suffisant
+    for (const candidate of scored) {
+        if (
+            selected.length >=
+            MAX_EXTRA_PAGES
+        ) {
+            break
+        }
+
+        if (
+            !selected.some(
+                (item) =>
+                    item.url === candidate.url
+            )
+        ) {
+            selected.push(candidate)
+        }
+    }
+
+    return selected.map(
+        (item) => item.url
+    )
 }
 
-async function scrapePage(url, includeLinks = false) {
+async function scrapePage(
+    url,
+    includeLinks = false
+) {
     const response = await fetch(
         "https://api.firecrawl.dev/v2/scrape",
         {
             method: "POST",
+
             headers: {
                 Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
-                "Content-Type": "application/json",
+                "Content-Type":
+                    "application/json",
             },
+
             body: JSON.stringify({
                 url,
+
                 formats: includeLinks
                     ? ["markdown", "links"]
                     : ["markdown"],
+
                 onlyMainContent: true,
+
                 removeBase64Images: true,
+
                 blockAds: true,
 
-                // Évite le retry automatique avec proxy enhanced,
-                // qui peut coûter plus de crédits.
                 proxy: "basic",
 
-                // Autorise Firecrawl à réutiliser son cache
-                maxAge: 604800000,
+                maxAge:
+                    FIRECRAWL_MAX_AGE_MS,
 
                 timeout: 30000,
             }),
@@ -180,63 +412,290 @@ async function scrapePage(url, includeLinks = false) {
 
     const data = await response.json()
 
-    if (!response.ok || !data.success) {
+    if (
+        !response.ok ||
+        !data.success
+    ) {
         throw new Error(
-            data.error || `Firecrawl failed for ${url}`
+            data.error ||
+                `Firecrawl failed for ${url}`
         )
     }
 
     return {
-        markdown: data.data?.markdown || "",
-        links: data.data?.links || [],
+        markdown:
+            data.data?.markdown || "",
+
+        links:
+            data.data?.links || [],
     }
 }
 
-function formatPageForPrompt(label, url, markdown) {
+function cleanMarkdown(markdown) {
+    const lines =
+        markdown.split("\n")
+
+    const seen = new Set()
+
+    const boilerplatePatterns = [
+        /cookie preferences/i,
+        /manage cookies/i,
+        /accept cookies/i,
+        /privacy policy/i,
+        /terms of use/i,
+        /all rights reserved/i,
+        /skip to content/i,
+        /sign in to your account/i,
+    ]
+
+    const cleaned = []
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim()
+
+        if (!line) {
+            continue
+        }
+
+        if (
+            boilerplatePatterns.some(
+                (pattern) =>
+                    pattern.test(line)
+            )
+        ) {
+            continue
+        }
+
+        const normalized =
+            line
+                .toLowerCase()
+                .replace(/\s+/g, " ")
+
+        // On retire les répétitions exactes
+        // typiques des menus/blocs répétés
+        if (
+            normalized.length > 3 &&
+            seen.has(normalized)
+        ) {
+            continue
+        }
+
+        seen.add(normalized)
+        cleaned.push(line)
+    }
+
+    return cleaned.join("\n")
+}
+
+function formatPageForPrompt(
+    label,
+    url,
+    markdown,
+    maxChars
+) {
+    const cleaned =
+        cleanMarkdown(markdown)
+
     return `
 ### ${label}
 URL: ${url}
 
-${markdown.slice(0, MAX_CHARS_PER_PAGE)}
+${cleaned.slice(0, maxChars)}
 `
+}
+
+function tidyTerm(value) {
+    if (
+        value === null ||
+        value === undefined
+    ) {
+        return ""
+    }
+
+    let result = String(value)
+        .replace(/\s+/g, " ")
+        .trim()
+
+    // Supprime les explications de type :
+    // "Yvon Chouinard (Founder)"
+    // sans toucher aux noms eux-mêmes.
+    result = result.replace(
+        /\s+\([^)]{2,120}\)\s*$/,
+        ""
+    )
+
+    return result.trim()
+}
+
+function dedupeKey(value) {
+    return value
+        .toLowerCase()
+        .replace(/[®™©]/g, "")
+        .replace(/[.,;:!?'"’“”()]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+}
+
+function normalizeBrand(rawBrand) {
+    const limits = {
+        iconic: 6,
+        products: 8,
+        people: 4,
+        places: 4,
+        vocabulary: 12,
+        everyday: 10,
+        tone: 5,
+    }
+
+    const categories = [
+        "iconic",
+        "products",
+        "people",
+        "places",
+        "vocabulary",
+        "everyday",
+        "tone",
+    ]
+
+    const seen = new Set()
+
+    const result = {
+        name:
+            tidyTerm(rawBrand.name) ||
+            "UNKNOWN",
+
+        iconic: [],
+        products: [],
+        people: [],
+        places: [],
+        vocabulary: [],
+        everyday: [],
+        tone: [],
+    }
+
+    for (const category of categories) {
+        const values =
+            Array.isArray(
+                rawBrand[category]
+            )
+                ? rawBrand[category]
+                : []
+
+        for (const rawValue of values) {
+            if (
+                result[category].length >=
+                limits[category]
+            ) {
+                break
+            }
+
+            const value =
+                tidyTerm(rawValue)
+
+            if (!value) {
+                continue
+            }
+
+            // Filtre quelques rôles génériques
+            // qui apparaissaient par exemple
+            // dans Le Monde.
+            if (
+                category === "people" &&
+                /^(journalistes?|rédacteur|rédacteurs|editors?|journalists?|staff|team|équipe|employees?)\b/i.test(
+                    value
+                )
+            ) {
+                continue
+            }
+
+            const key =
+                dedupeKey(value)
+
+            if (
+                !key ||
+                seen.has(key)
+            ) {
+                continue
+            }
+
+            seen.add(key)
+
+            result[category].push(
+                value
+            )
+        }
+    }
+
+    return result
 }
 
 const brandSchema = {
     type: "object",
+
     additionalProperties: false,
+
     properties: {
         name: {
             type: "string",
         },
+
         iconic: {
             type: "array",
-            items: { type: "string" },
+            maxItems: 6,
+            items: {
+                type: "string",
+            },
         },
+
         products: {
             type: "array",
-            items: { type: "string" },
+            maxItems: 8,
+            items: {
+                type: "string",
+            },
         },
+
         people: {
             type: "array",
-            items: { type: "string" },
+            maxItems: 4,
+            items: {
+                type: "string",
+            },
         },
+
         places: {
             type: "array",
-            items: { type: "string" },
+            maxItems: 4,
+            items: {
+                type: "string",
+            },
         },
+
         vocabulary: {
             type: "array",
-            items: { type: "string" },
+            maxItems: 12,
+            items: {
+                type: "string",
+            },
         },
+
         everyday: {
             type: "array",
-            items: { type: "string" },
+            maxItems: 10,
+            items: {
+                type: "string",
+            },
         },
+
         tone: {
             type: "array",
-            items: { type: "string" },
+            maxItems: 5,
+            items: {
+                type: "string",
+            },
         },
     },
+
     required: [
         "name",
         "iconic",
@@ -249,9 +708,68 @@ const brandSchema = {
     ],
 }
 
-export default async function handler(req, res) {
-    res.setHeader("Access-Control-Allow-Origin", "*")
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
+const BRAND_PROMPT = `
+Build a durable lexical profile for Brand Ipsum from website content.
+
+The output will be injected directly into Lorem Ipsum.
+Choose terms that make the generated text recognizably belong to the brand.
+
+Infer internally:
+ecommerce | media | saas | other.
+
+PRIORITIZE
+- iconic slogans, symbols and recurring concepts
+- signature products and core services
+- named people strongly tied to the brand
+- meaningful places
+- distinctive recurring vocabulary
+- concrete objects, materials, actions and interface terms
+- lasting communication tone
+
+DURABILITY
+Prefer identity likely to remain relevant for years.
+
+EXCLUDE
+- temporary promotions and seasonal campaigns
+- current news and article subjects
+- recently featured products unless they are signature products
+- minor or temporary software features
+- generic marketing language
+- SEO, navigation and legal boilerplate
+- unsupported information
+- duplicates
+
+TYPE RULES
+Ecommerce: favor signature products, materials, craft, heritage and design codes.
+Media: favor mission, recurring formats, sections, history and editorial vocabulary. Ignore current events and people merely present in today's news.
+SaaS: favor core products, durable features, interface objects and recognizable positioning.
+
+LEXICAL QUALITY
+- prefer short reusable units, usually 1–3 words
+- official slogans and product names may be longer
+- prefer concrete terms over explanations
+- preserve official proper names
+- do not add parenthetical explanations
+- people must be named individuals, never generic roles
+- a category may be empty when evidence is weak
+
+Use the brand/site's natural language.
+`
+
+export default async function handler(
+    req,
+    res
+) {
+    res.setHeader(
+        "Access-Control-Allow-Origin",
+        "*"
+    )
+
+    res.setHeader(
+        "Access-Control-Allow-Methods",
+        "POST, OPTIONS"
+    )
+
     res.setHeader(
         "Access-Control-Allow-Headers",
         "Content-Type"
@@ -268,19 +786,27 @@ export default async function handler(req, res) {
     }
 
     try {
-        if (!process.env.OPENAI_API_KEY) {
+        if (
+            !process.env.OPENAI_API_KEY
+        ) {
             return res.status(500).json({
-                error: "OPENAI_API_KEY is missing",
+                error:
+                    "OPENAI_API_KEY is missing",
             })
         }
 
-        if (!process.env.FIRECRAWL_API_KEY) {
+        if (
+            !process.env
+                .FIRECRAWL_API_KEY
+        ) {
             return res.status(500).json({
-                error: "FIRECRAWL_API_KEY is missing",
+                error:
+                    "FIRECRAWL_API_KEY is missing",
             })
         }
 
-        const { url } = req.body || {}
+        const { url } =
+            req.body || {}
 
         if (!url) {
             return res.status(400).json({
@@ -288,29 +814,59 @@ export default async function handler(req, res) {
             })
         }
 
-        const parsedUrl = normalizeUrl(url)
-        const hostname = normalizeHostname(
-            parsedUrl.hostname
-        )
+        const parsedUrl =
+            normalizeUrl(url)
 
-        const homepageUrl = `${parsedUrl.protocol}//${parsedUrl.host}`
+        const hostname =
+            normalizeHostname(
+                parsedUrl.hostname
+            )
 
-        const cacheKey = `brand-ipsum:v2:${hostname}`
+        const homepageUrl =
+            `${parsedUrl.protocol}//${parsedUrl.host}`
 
-        // 1 — Vérifier le cache Redis
+        // V3 = nouveau cache.
+        // On ne récupère donc jamais
+        // les anciens résultats V2.
+        const cacheKey =
+            `brand-ipsum:v3:${hostname}`
+
+        // --------------------------------
+        // 1. CACHE REDIS
+        // --------------------------------
+
         if (redis) {
             try {
-                const cachedBrand =
-                    await redis.get(cacheKey)
+                const cached =
+                    await redis.get(
+                        cacheKey
+                    )
 
-                if (cachedBrand) {
-                    return res.status(200).json({
-                        brand: cachedBrand,
-                        meta: {
-                            source: "cache",
-                            hostname,
-                        },
-                    })
+                if (cached) {
+                    const cachedBrand =
+                        cached.brand ||
+                        cached
+
+                    return res
+                        .status(200)
+                        .json({
+                            brand:
+                                cachedBrand,
+
+                            meta: {
+                                source:
+                                    "cache",
+
+                                hostname,
+
+                                version:
+                                    "v3",
+
+                                pagesUsed:
+                                    cached.pagesUsed ||
+                                    [],
+                            },
+                        })
                 }
             } catch (error) {
                 console.error(
@@ -320,11 +876,15 @@ export default async function handler(req, res) {
             }
         }
 
-        // 2 — Scraper la home + récupérer ses liens
-        const homepage = await scrapePage(
-            homepageUrl,
-            true
-        )
+        // --------------------------------
+        // 2. HOMEPAGE
+        // --------------------------------
+
+        const homepage =
+            await scrapePage(
+                homepageUrl,
+                true
+            )
 
         if (!homepage.markdown) {
             throw new Error(
@@ -332,45 +892,68 @@ export default async function handler(req, res) {
             )
         }
 
-        // 3 — Choisir maximum deux pages evergreen
-        const evergreenUrls =
+        // --------------------------------
+        // 3. CHOIX DES PAGES EVERGREEN
+        // --------------------------------
+
+        const extraUrls =
             selectEvergreenPages(
                 homepage.links,
                 hostname,
                 homepageUrl
             )
 
-        // 4 — Scraper ces pages en parallèle
-        const extraPages = await Promise.all(
-            evergreenUrls.map(async (pageUrl) => {
-                try {
-                    const page =
-                        await scrapePage(pageUrl)
+        // --------------------------------
+        // 4. SCRAPE MAX 2 PAGES
+        // --------------------------------
 
-                    return {
-                        url: pageUrl,
-                        markdown: page.markdown,
+        const extraPages =
+            await Promise.all(
+                extraUrls.map(
+                    async (pageUrl) => {
+                        try {
+                            const page =
+                                await scrapePage(
+                                    pageUrl
+                                )
+
+                            if (
+                                !page.markdown
+                            ) {
+                                return null
+                            }
+
+                            return {
+                                url: pageUrl,
+
+                                markdown:
+                                    page.markdown,
+                            }
+                        } catch (error) {
+                            console.error(
+                                `Extra page failed: ${pageUrl}`,
+                                error
+                            )
+
+                            return null
+                        }
                     }
-                } catch (error) {
-                    console.error(
-                        `Extra page scrape failed: ${pageUrl}`,
-                        error
-                    )
-
-                    return null
-                }
-            })
-        )
+                )
+            )
 
         const usableExtraPages =
             extraPages.filter(Boolean)
 
-        // 5 — Construire un contexte court
+        // --------------------------------
+        // 5. CONTEXTE COURT
+        // --------------------------------
+
         let websiteContext =
             formatPageForPrompt(
                 "Homepage",
                 homepageUrl,
-                homepage.markdown
+                homepage.markdown,
+                MAX_HOME_CHARS
             )
 
         usableExtraPages.forEach(
@@ -379,135 +962,97 @@ export default async function handler(req, res) {
                     formatPageForPrompt(
                         `Evergreen page ${index + 1}`,
                         page.url,
-                        page.markdown
+                        page.markdown,
+                        MAX_EXTRA_PAGE_CHARS
                     )
             }
         )
 
-        // 6 — Un seul appel OpenAI
+        // --------------------------------
+        // 6. UN SEUL APPEL OPENAI
+        // --------------------------------
+
         const response =
             await client.responses.create({
-                model: "gpt-4.1-mini",
+                model:
+                    "gpt-4.1-mini",
 
-                input: `
-You are creating the brand vocabulary for Brand Ipsum, a playful branded Lorem Ipsum generator.
+                // Aide le prompt caching
+                // à router ensemble les
+                // requêtes ayant le même
+                // préfixe stable.
+                prompt_cache_key:
+                    "brand-ipsum-v3",
 
-Your job is NOT to summarize the website.
-Your job is to identify the durable, recognizable identity of the brand.
+                input: [
+                    {
+                        role: "system",
+                        content:
+                            BRAND_PROMPT,
+                    },
 
+                    {
+                        role: "user",
+                        content: `
 DOMAIN:
 ${hostname}
 
 WEBSITE CONTENT:
 ${websiteContext}
-
-CORE PRINCIPLE
-
-Separate permanent brand identity from temporary website content.
-
-The final vocabulary should still feel recognizably true to the brand six months or several years from now.
-
-PRIORITIZE
-
-1. Iconic and distinctive references:
-   slogans, symbols, signature concepts, recurring franchises, historically important ideas.
-
-2. Signature products or services:
-   well-known product names, permanent product families, core services and recurring offers.
-
-3. People:
-   founders, designers, executives, ambassadors or culturally important people strongly associated with the brand.
-
-4. Places:
-   headquarters, founding locations, iconic stores, factories, studios or geographic references genuinely linked to the brand.
-
-5. Distinctive vocabulary:
-   words the brand repeatedly uses or concepts strongly associated with its identity.
-
-6. Everyday concrete vocabulary:
-   objects, materials, activities, interfaces, places or actions naturally connected to the brand.
-
-7. Tone:
-   a few concise adjectives describing the brand's lasting communication style.
-
-TEMPORARY CONTENT
-
-Downweight or ignore:
-- sales and discounts
-- temporary promotions
-- current campaigns unless historically iconic
-- seasonal collections
-- "new arrivals"
-- current news events
-- individual articles
-- short-lived homepage merchandising
-- SEO boilerplate
-- cookie / legal / navigation language
-
-ECOMMERCE RULE
-
-If this is an ecommerce brand:
-- favor signature products, permanent product families, materials, craft, design codes, heritage and recurring terminology;
-- do not let today's featured products or promotions dominate the result.
-
-MEDIA / NEWS RULE
-
-If this is a news, media or publishing brand:
-- focus on editorial identity, recurring sections, signature formats, history, mission and journalistic vocabulary;
-- do NOT include current politicians, wars, sports results, celebrities or today's headlines simply because they appear on the homepage;
-- include a named topic/person only if it is structurally associated with the publication itself.
-
-SAAS / TECHNOLOGY RULE
-
-If this is a software or technology company:
-- favor core products, product concepts, interface vocabulary, recurring features, founders and durable positioning;
-- ignore temporary release announcements unless they represent a major permanent product.
-
-LANGUAGE
-
-Use the language most naturally associated with the brand and the supplied website.
-For a predominantly French brand/site, return the brand vocabulary in French.
-Keep official product names and proper nouns in their original form.
-
-QUALITY
-
-Prefer specific and concrete terms over generic marketing words.
-
-Good:
-"Air Max", "Swoosh", "Birkin", "Apple Park", "Wrapped"
-
-Weak:
-"innovation", "quality", "excellence", "customer-centric"
-
-Generic terms may appear only when they are genuinely central to the brand.
-
-Do not invent unsupported facts.
-Avoid duplicate or near-duplicate entries.
-Keep arrays concise and useful for text generation.
 `,
+                    },
+                ],
 
                 text: {
                     format: {
                         type: "json_schema",
-                        name: "brand_profile",
+
+                        name:
+                            "brand_profile",
+
                         strict: true,
-                        schema: brandSchema,
+
+                        schema:
+                            brandSchema,
                     },
                 },
             })
 
-        const brand = JSON.parse(
-            response.output_text
-        )
+        const rawBrand =
+            JSON.parse(
+                response.output_text
+            )
 
-        // 7 — Enregistrer 7 jours dans Redis
+        // --------------------------------
+        // 7. NETTOYAGE FINAL
+        // --------------------------------
+
+        const brand =
+            normalizeBrand(rawBrand)
+
+        const pagesUsed = [
+            homepageUrl,
+
+            ...usableExtraPages.map(
+                (page) => page.url
+            ),
+        ]
+
+        // --------------------------------
+        // 8. CACHE 7 JOURS
+        // --------------------------------
+
         if (redis) {
             try {
                 await redis.set(
                     cacheKey,
-                    brand,
                     {
-                        ex: CACHE_TTL_SECONDS,
+                        brand,
+                        pagesUsed,
+                    },
+                    {
+                        ex:
+                            CACHE_TTL_SECONDS,
                     }
                 )
             } catch (error) {
@@ -518,17 +1063,42 @@ Keep arrays concise and useful for text generation.
             }
         }
 
+        // --------------------------------
+        // 9. REPONSE
+        // --------------------------------
+
         return res.status(200).json({
             brand,
+
             meta: {
                 source: "fresh",
+
+                version: "v3",
+
                 hostname,
-                pagesUsed: [
-                    homepageUrl,
-                    ...usableExtraPages.map(
-                        (page) => page.url
-                    ),
-                ],
+
+                pagesUsed,
+
+                contextChars:
+                    websiteContext.length,
+
+                usage: {
+                    inputTokens:
+                        response.usage
+                            ?.input_tokens ??
+                        null,
+
+                    cachedTokens:
+                        response.usage
+                            ?.input_tokens_details
+                            ?.cached_tokens ??
+                        0,
+
+                    outputTokens:
+                        response.usage
+                            ?.output_tokens ??
+                        null,
+                },
             },
         })
     } catch (error) {
