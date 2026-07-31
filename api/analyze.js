@@ -347,10 +347,13 @@ function selectEvergreenPages(
                 item.score >=
                 MIN_EXTRA_PAGE_SCORE
         )
-        .sort(
-            (a, b) =>
-                b.score - a.score
-        )
+       .sort((a, b) => {
+    if (b.score !== a.score) {
+        return b.score - a.score
+    }
+
+    return getPathDepth(a.url) - getPathDepth(b.url)
+})
 
     const selected = []
 
