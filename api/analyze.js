@@ -420,13 +420,21 @@ async function mapWebsite(url) {
             },
 
             body: JSON.stringify({
-                url,
-                sitemap: "include",
-                includeSubdomains: true,
-                ignoreQueryParameters: true,
-                limit: 500,
-                timeout: 30000,
-            }),
+    url,
+
+    search:
+        "about company history heritage mission values vision our business how we work brand",
+
+    sitemap: "include",
+    includeSubdomains: true,
+    ignoreQueryParameters: true,
+
+    // 200 URLs ciblées valent mieux que
+    // 500 URLs génériques.
+    limit: 200,
+
+    timeout: 30000,
+}),
         }
     )
 
