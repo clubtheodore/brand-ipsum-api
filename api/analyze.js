@@ -1206,36 +1206,43 @@ ${websiteContext}
         return res.status(200).json({
             brand,
 
-            meta: {
-                source: "fresh",
+meta: {
+    source: "fresh",
 
-                version: "v3",
+    version: "v3",
 
-                hostname,
+    hostname,
 
-                pagesUsed,
+    pagesUsed,
 
-                contextChars:
-                    websiteContext.length,
+    discovery: {
+        source: discoverySource,
+        homepageLinks: homepage.links.length,
+        mappedLinks: mappedLinksCount,
+        selectedPages: extraUrls,
+    },
 
-                usage: {
-                    inputTokens:
-                        response.usage
-                            ?.input_tokens ??
-                        null,
+    contextChars:
+        websiteContext.length,
 
-                    cachedTokens:
-                        response.usage
-                            ?.input_tokens_details
-                            ?.cached_tokens ??
-                        0,
+    usage: {
+        inputTokens:
+            response.usage
+                ?.input_tokens ??
+            null,
 
-                    outputTokens:
-                        response.usage
-                            ?.output_tokens ??
-                        null,
-                },
-            },
+        cachedTokens:
+            response.usage
+                ?.input_tokens_details
+                ?.cached_tokens ??
+            0,
+
+        outputTokens:
+            response.usage
+                ?.output_tokens ??
+            null,
+    },
+},
         })
     } catch (error) {
         console.error(
