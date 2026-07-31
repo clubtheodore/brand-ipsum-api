@@ -83,12 +83,37 @@ function pathContains(pathname, term) {
 
 function getPathDepth(url) {
     try {
-        return new URL(url).pathname
+        let segments = new URL(url).pathname
             .split("/")
-            .filter(Boolean).length
+            .filter(Boolean)
+
+        // Ignore structural / locale prefixes such as:
+        // /global/en/
+        // /en/
+        // /fr-fr/
+        // /en-us/
+        segments = segments.filter((segment, index) => {
+            const value = segment.toLowerCase()
+
+            if (index === 0 && value === "global") {
+                return false
+            }
+
+            if (
+                /^[a-z]{2}$/.test(value) ||
+                /^[a-z]{2}-[a-z]{2}$/.test(value)
+            ) {
+                return false
+            }
+
+            return true
+        })
+
+        return segments.length
     } catch {
         return 99
     }
+}   }
 }
 
 function scoreEvergreenUrl(url) {
@@ -107,7 +132,6 @@ function scoreEvergreenUrl(url) {
 
     // Pages que l'on ne veut presque jamais utiliser
     const hardNegativePatterns = [
-        "/stories/",
         "/story/",
         "/blog/",
         "/blogs/",
