@@ -409,44 +409,75 @@ function selectEvergreenPages(
 }
 
 async function mapWebsite(url) {
-    const response = await fetch(
-        "https://api.firecrawl.dev/v2/map",
-        {
-            method: "POST",
+    const maxAttempts = 3
 
-            headers: {
-                Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
-                "Content-Type": "application/json",
-            },
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const response = await fetch(
+            "https://api.firecrawl.dev/v2/map",
+            {
+                method: "POST",
 
-            body: JSON.stringify({
-    url,
+                headers: {
+                    Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+                    "Content-Type": "application/json",
+                },
 
-    search:
-        "about company history heritage mission values vision our business how we work brand",
+                body: JSON.stringify({
+                    url,
 
-    sitemap: "include",
-    includeSubdomains: true,
-    ignoreQueryParameters: true,
+                    search:
+                        "about company history heritage mission values vision our business how we work brand",
 
-    // 200 URLs ciblées valent mieux que
-    // 500 URLs génériques.
-    limit: 200,
+                    sitemap: "include",
+                    includeSubdomains: true,
+                    ignoreQueryParameters: true,
 
-    timeout: 30000,
-}),
+                    limit: 200,
+
+                    timeout: 30000,
+                }),
+            }
+        )
+
+        const rawText = await response.text()
+
+        let data = null
+
+        try {
+            data = JSON.parse(rawText)
+        } catch {
+            // Firecrawl peut parfois renvoyer
+            // un 502/503/504 en texte brut.
         }
-    )
 
-    const data = await response.json()
+        if (response.ok && data?.success) {
+            return data.links || []
+        }
 
-    if (!response.ok || !data.success) {
+        const retryable =
+            response.status === 502 ||
+            response.status === 503 ||
+            response.status === 504
+
+        if (retryable && attempt < maxAttempts) {
+            console.warn(
+                `Firecrawl map attempt ${attempt} failed with ${response.status}. Retrying...`
+            )
+
+            await new Promise((resolve) =>
+                setTimeout(resolve, 800 * attempt)
+            )
+
+            continue
+        }
+
         throw new Error(
-            data.error || `Firecrawl map failed for ${url}`
+            data?.error ||
+                `Firecrawl map failed (${response.status}): ${rawText.slice(0, 200)}`
         )
     }
 
-    return data.links || []
+    return []
 }
 
 async function scrapePage(
@@ -938,7 +969,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-4:${hostname}`
+    `brand-ipsum:v3-5:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
