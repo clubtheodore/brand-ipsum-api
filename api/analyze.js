@@ -1018,12 +1018,14 @@ let mappedLinksCount = 0
 // Si la homepage ne révèle aucune bonne page evergreen,
 // on utilise la carte du site comme fallback.
 if (extraUrls.length === 0) {
+    discoverySource = "map"
+
     try {
         const mappedLinks =
             await mapWebsite(homepageUrl)
 
-        mappedLinksCount = mappedLinks.length
-        discoverySource = "map"
+        mappedLinksCount =
+            mappedLinks.length
 
         extraUrls =
             selectEvergreenPages(
@@ -1032,6 +1034,8 @@ if (extraUrls.length === 0) {
                 homepageUrl
             )
     } catch (error) {
+        discoverySource = "map-error"
+
         console.error(
             "Firecrawl map fallback failed:",
             error
