@@ -590,12 +590,43 @@ function normalizeBrand(rawBrand) {
             }
 
             const value =
-                tidyTerm(rawValue)
+    tidyTerm(rawValue)
 
-            if (!value) {
-                continue
-            }
+if (!value) {
+    continue
+}
 
+const utilityPatterns = [
+    /^free shipping$/i,
+    /^orders? over/i,
+    /^shop$/i,
+    /^shop now$/i,
+    /^find a store$/i,
+    /^learn more$/i,
+    /^read more$/i,
+    /^buy now$/i,
+    /^add to cart$/i,
+    /^sign in$/i,
+    /^subscribe$/i,
+    /^newsletter$/i,
+]
+
+if (
+    utilityPatterns.some((pattern) =>
+        pattern.test(value)
+    )
+) {
+    continue
+}
+
+if (
+    category === "people" &&
+    /^(journalistes?|rédacteur|rédacteurs|editors?|journalists?|staff|team|équipe|employees?)\b/i.test(
+        value
+    )
+) {
+    continue
+}
             // Filtre quelques rôles génériques
             // qui apparaissaient par exemple
             // dans Le Monde.
@@ -751,6 +782,7 @@ LEXICAL QUALITY
 - preserve official proper names
 - do not add parenthetical explanations
 - people must be named individuals, never generic roles
+- everyday means concrete brand-world objects/actions, never website navigation, ecommerce utilities or calls to action
 - a category may be empty when evidence is weak
 
 Use the brand/site's natural language.
