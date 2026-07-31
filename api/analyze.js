@@ -194,10 +194,20 @@ function scoreEvergreenUrl(url) {
 
     let score = 0
     let kind = "other"
+    if (path.includes("/stories/")) {
+    score -= 8
+}
 
     const identityTerms = [
         ["about-us", 35],
         ["who-we-are", 35],
+        ["our-business", 30],
+["how-we-work", 30],
+["our-roots", 28],
+["culture-and-values", 30],
+["culture", 18],
+["business-idea", 24],
+["vision", 20],
         ["our-history", 35],
         ["our-story", 32],
         ["heritage", 30],
