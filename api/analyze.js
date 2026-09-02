@@ -1080,7 +1080,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-9:${language}:${hostname}`
+    `brand-ipsum:v3-10:${language}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1149,6 +1149,7 @@ export default async function handler(
 
 let discoverySource = "homepage"
 let mappedLinksCount = 0
+let searchPreview = []
         
         let extraUrls =
     selectEvergreenPages(
@@ -1163,10 +1164,33 @@ if (extraUrls.length === 0) {
     discoverySource = "search"
 
     try {
-        const searchResults =
+       const searchResults =
     await searchEvergreenPages(
         hostname,
         language
+    )
+
+searchPreview =
+    searchResults
+        .slice(0, 10)
+        .map((item) => ({
+            title:
+                item.title || "",
+            url:
+                item.url || "",
+            description:
+                (item.description || "")
+                    .slice(0, 180),
+        }))
+
+mappedLinksCount =
+    searchResults.length
+
+extraUrls =
+    selectEvergreenPages(
+        searchResults,
+        hostname,
+        homepageUrl
     )
 
         mappedLinksCount =
@@ -1367,12 +1391,16 @@ meta: {
 
     pagesUsed,
 
-    discovery: {
-        source: discoverySource,
-        homepageLinks: homepage.links.length,
-        mappedLinks: mappedLinksCount,
-        selectedPages: extraUrls,
-    },
+   discovery: {
+    source: discoverySource,
+    homepageLinks:
+        homepage.links.length,
+    mappedLinks:
+        mappedLinksCount,
+    selectedPages:
+        extraUrls,
+    searchPreview,
+},
 
     contextChars:
         websiteContext.length,
