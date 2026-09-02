@@ -1142,7 +1142,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-16:${language}:${hostname}`
+    `brand-ipsum:v3-17:${language}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1240,9 +1240,11 @@ if (extraUrls.length === 0) {
                         item.title || "",
                     url:
                         item.url || "",
-                    description:
-                        (item.description || "")
-                            .slice(0, 180),
+description:
+    truncateCleanly(
+        item.description || "",
+        600
+    ),
                 }))
 
         mappedLinksCount =
