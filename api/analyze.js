@@ -1011,6 +1011,10 @@ PRODUCTS
 - exclude certifications and standards
 - exclude processes, production methods and business models
 - an item used inside a product is not itself a product
+- when strong evidence identifies several signature or flagship products, prioritize those and do not fill remaining slots with incidental current products
+- fewer highly distinctive products are better than a full list of generic or temporary products
+- a product appearing on a scraped product page is not automatically a signature product
+- when the requested language is available for signature product names, do not add foreign-language equivalents or unrelated foreign-language products merely to fill the category
 
 PEOPLE
 - named individuals only
@@ -1028,6 +1032,9 @@ VOCABULARY
 - reject sentences, claims and explanations
 - reject generic marketing vocabulary
 - reject broad abstract values when they could describe many brands
+- reject meta-descriptions of the assortment such as "signature products", "iconic pieces", "best sellers" or equivalent category labels
+- reject fragments of marketing sentences such as "made to last" unless they are established proprietary expressions
+- when output language is requested, avoid foreign-language generic vocabulary if a natural localized equivalent exists
 
 EVERYDAY
 - strongly prefer 1 word
@@ -1135,7 +1142,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-15:${language}:${hostname}`
+    `brand-ipsum:v3-16:${language}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
