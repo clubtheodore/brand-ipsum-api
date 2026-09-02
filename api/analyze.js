@@ -1271,7 +1271,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-26:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-27:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1454,51 +1454,65 @@ description:
                 MAX_HOME_CHARS
             )
 
+        let productEvidence = ""
+
         usableExtraPages.forEach(
             (page, index) => {
-                websiteContext +=
+                const pageKind =
+                    scoreEvergreenUrl(
+                        page.url
+                    ).kind
+
+                const formattedPage =
                     formatPageForPrompt(
-                        `Evergreen page ${index + 1}`,
+                        pageKind === "offering"
+                            ? `Product evidence page ${index + 1}`
+                            : `Evergreen page ${index + 1}`,
                         page.url,
                         page.markdown,
                         MAX_EXTRA_PAGE_CHARS
                     )
+
+                if (
+                    pageKind === "offering"
+                ) {
+                    productEvidence +=
+                        formattedPage
+                } else {
+                    websiteContext +=
+                        formattedPage
+                }
             }
         )
-if (searchPreview.length > 0) {
-    websiteContext += `
-### SEARCH DISCOVERY EVIDENCE
 
-The following search snippets are secondary evidence.
-Use them especially to identify:
-- signature products
-- flagship products
-- enduring or best-selling products
-- official localized product names
+        const productSearchEvidence =
+            searchPreview
+                .filter((item) => {
+                    const url =
+                        item.url || ""
 
-Search snippets must NOT be used to infer slogans, taglines,
-mottos or iconic brand expressions merely because wording
-appears repeatedly.
+                    return !(
+                        url.includes("-stock") ||
+                        url.includes("/stock/")
+                    )
+                })
+                .slice(0, 10)
 
-Only treat wording as iconic when the evidence explicitly
-identifies it as an official slogan, tagline, motto, symbol
-or established brand nickname.
+        if (
+            productSearchEvidence.length > 0
+        ) {
+            productEvidence += `
+### SEARCH PRODUCT EVIDENCE
 
-Do not treat a temporary article subject as a durable brand term
-unless the snippet explicitly identifies it as signature,
-flagship, enduring or a best-seller.
+The following search snippets are secondary product evidence.
+Use them only to identify products, services or collections that
+are explicitly presented as signature, flagship, iconic,
+enduring, permanent or best-selling.
 
-${searchPreview
-    .filter((item) => {
-        const url =
-            item.url || ""
+Do not treat an article title or a temporary product mention as
+a durable product merely because it appears in search results.
 
-        return !(
-            url.includes("-stock") ||
-            url.includes("/stock/")
-        )
-    })
-    .slice(0, 10)
+${productSearchEvidence
     .map(
         (item, index) => `
 [${index + 1}]
@@ -1509,7 +1523,13 @@ SNIPPET: ${item.description}
     )
     .join("\n")}
 `
-}
+        }
+
+        if (!productEvidence.trim()) {
+            productEvidence =
+                "No strong product evidence was found."
+        }
+
         // --------------------------------
         // 6. UN SEUL APPEL OPENAI
         // --------------------------------
@@ -1542,8 +1562,20 @@ ${hostname}
 OUTPUT LANGUAGE:
 ${language}
 
-WEBSITE CONTENT:
+OUTPUT LOCALE:
+${locale}
+
+GENERAL WEBSITE CONTEXT:
 ${websiteContext}
+
+PRODUCT EVIDENCE:
+${productEvidence}
+
+SOURCE RULES:
+- The products array MUST use PRODUCT EVIDENCE as its exclusive source.
+- Never add a product solely because it appears in GENERAL WEBSITE CONTEXT or on the homepage.
+- If PRODUCT EVIDENCE supports only one or two durable products, return only those.
+- Other categories may use both GENERAL WEBSITE CONTEXT and PRODUCT EVIDENCE.
 `,
                     },
                 ],
