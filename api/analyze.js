@@ -267,7 +267,16 @@ function scoreEvergreenUrl(url) {
     if (/(?:^|[-_/])\d{6,8}(?:[-_/]|$)/.test(path)) {
         score -= 15
     }
-
+// Les pages explicitement "stock" reflètent souvent
+// une disponibilité commerciale ponctuelle plutôt
+// qu'un produit signature durable.
+if (
+    path.includes("-stock") ||
+    path.includes("/stock/")
+) {
+    score -= 30
+}
+    
     // Plus une page est profonde, plus elle risque
     // de parler d'un sujet très spécifique
     const depth = getPathDepth(url)
@@ -1259,7 +1268,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-22:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-23:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
