@@ -957,7 +957,11 @@ GENERAL
 - preserve the source language
 - if evidence is weak, leave the category sparse rather than filling it with generic terms
 
-Use the brand/site's natural language.
+LANGUAGE
+- use the requested output language for generic vocabulary, everyday terms and tone
+- preserve official slogans, product names, service names, people, places and proprietary terminology exactly as used by the brand
+- never translate an official brand expression just to match the output language
+- when equivalent official localized product names exist in the source, prefer the version matching the requested output language
 `
 
 export default async function handler(
@@ -1009,8 +1013,10 @@ export default async function handler(
             })
         }
 
-        const { url } =
-            req.body || {}
+        const {
+    url,
+    language = "en",
+} = req.body || {}
 
         if (!url) {
             return res.status(400).json({
@@ -1033,7 +1039,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-8:${hostname}`
+    `brand-ipsum:v3-9:${language}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1231,6 +1237,9 @@ if (extraUrls.length === 0) {
                         content: `
 DOMAIN:
 ${hostname}
+
+OUTPUT LANGUAGE:
+${language}
 
 WEBSITE CONTENT:
 ${websiteContext}
