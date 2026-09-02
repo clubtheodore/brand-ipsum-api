@@ -1268,7 +1268,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-24:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-25:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1486,6 +1486,15 @@ unless the snippet explicitly identifies it as signature,
 flagship, enduring or a best-seller.
 
 ${searchPreview
+    .filter((item) => {
+        const url =
+            item.url || ""
+
+        return !(
+            url.includes("-stock") ||
+            url.includes("/stock/")
+        )
+    })
     .slice(0, 10)
     .map(
         (item, index) => `
