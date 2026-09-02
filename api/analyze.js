@@ -1150,8 +1150,8 @@ export default async function handler(
 let discoverySource = "homepage"
 let mappedLinksCount = 0
 let searchPreview = []
-        
-        let extraUrls =
+
+let extraUrls =
     selectEvergreenPages(
         homepage.links,
         hostname,
@@ -1159,39 +1159,29 @@ let searchPreview = []
     )
 
 // Si la homepage ne révèle aucune bonne page evergreen,
-// on utilise la carte du site comme fallback.
+// on utilise Firecrawl Search comme fallback.
 if (extraUrls.length === 0) {
     discoverySource = "search"
 
     try {
-       const searchResults =
-    await searchEvergreenPages(
-        hostname,
-        language
-    )
+        const searchResults =
+            await searchEvergreenPages(
+                hostname,
+                language
+            )
 
-searchPreview =
-    searchResults
-        .slice(0, 10)
-        .map((item) => ({
-            title:
-                item.title || "",
-            url:
-                item.url || "",
-            description:
-                (item.description || "")
-                    .slice(0, 180),
-        }))
-
-mappedLinksCount =
-    searchResults.length
-
-extraUrls =
-    selectEvergreenPages(
-        searchResults,
-        hostname,
-        homepageUrl
-    )
+        searchPreview =
+            searchResults
+                .slice(0, 10)
+                .map((item) => ({
+                    title:
+                        item.title || "",
+                    url:
+                        item.url || "",
+                    description:
+                        (item.description || "")
+                            .slice(0, 180),
+                }))
 
         mappedLinksCount =
             searchResults.length
@@ -1203,7 +1193,8 @@ extraUrls =
                 homepageUrl
             )
     } catch (error) {
-        discoverySource = "search-error"
+        discoverySource =
+            "search-error"
 
         console.error(
             "Firecrawl search fallback failed:",
