@@ -904,14 +904,58 @@ Media: favor mission, recurring formats, sections, history and editorial vocabul
 SaaS: favor core products, durable features, interface objects and recognizable positioning.
 
 LEXICAL QUALITY
-- prefer short reusable units, usually 1–3 words
-- official slogans and product names may be longer
-- prefer concrete terms over explanations
-- preserve official proper names
-- do not add parenthetical explanations
-- people must be named individuals, never generic roles
-- everyday means concrete brand-world objects/actions, never website navigation, ecommerce utilities or calls to action
-- a category may be empty when evidence is weak
+
+The output is a vocabulary bank for insertion inside Lorem Ipsum.
+It is NOT a brand summary.
+
+Choose lexical units that make the text immediately and recognizably belong to this specific brand.
+
+ICONIC
+- preserve official slogans, taglines, symbols, nicknames and established brand expressions exactly as written
+- official slogans and taglines may be any length
+- never shorten, rewrite or split them
+- only include expressions that are genuinely distinctive to the brand
+
+PRODUCTS
+- preserve complete official product or service names
+- product names may exceed 2 words
+- favor signature, enduring or highly recognizable products over temporary releases
+
+PEOPLE
+- named individuals only
+- preserve complete names
+
+PLACES
+- named places strongly associated with the brand
+- preserve complete place names
+- reject generic regions or vague locations
+
+VOCABULARY
+- strongly prefer 1 word
+- use 2 words only when they form a natural, distinctive lexical unit
+- favor proprietary terminology, materials, techniques, recurring concepts and recognizable brand language
+- reject sentences, claims and explanations
+- reject generic marketing vocabulary
+- reject broad abstract values when they could describe many brands
+
+EVERYDAY
+- strongly prefer 1 word
+- maximum 2 words
+- favor concrete objects, materials, actions, interface elements or recurring objects from the brand world
+- reject website navigation, ecommerce utilities and calls to action
+
+TONE
+- one adjective only
+- use tone only to describe communication style
+- avoid generic brand virtues
+
+GENERAL
+- prefer distinctive over generic
+- prefer concrete over abstract
+- prefer owned or recognizable language over category vocabulary
+- never abbreviate, truncate or invent a term
+- preserve the source language
+- if evidence is weak, leave the category sparse rather than filling it with generic terms
 
 Use the brand/site's natural language.
 `
@@ -989,7 +1033,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-7:${hostname}`
+    `brand-ipsum:v3-8:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
