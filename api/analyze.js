@@ -494,8 +494,18 @@ function selectEvergreenPages(
 
 async function searchEvergreenPages(
     hostname,
-    language = "en"
+    language = "en",
+    locale = "en-US"
 ) {
+    let searchCountry = null
+
+    try {
+        searchCountry =
+            new Intl.Locale(locale)
+                .region || null
+    } catch {
+        searchCountry = null
+    }
     const brandHint =
         hostname
             .split(".")[0]
@@ -526,22 +536,26 @@ async function searchEvergreenPages(
                         "application/json",
                 },
 
-                body: JSON.stringify({
-                    query,
+            body: JSON.stringify({
+    query,
 
-                    sources: ["web"],
+    sources: ["web"],
 
-                    includeDomains: [
-                        hostname,
-                    ],
+    includeDomains: [
+        hostname,
+    ],
 
-                    limit,
+    country:
+        searchCountry ||
+        undefined,
 
-                    ignoreInvalidURLs:
-                        true,
+    limit,
 
-                    timeout: 30000,
-                }),
+    ignoreInvalidURLs:
+        true,
+
+    timeout: 30000,
+}),
             }
         )
 
@@ -1244,7 +1258,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-20:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-21:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1332,10 +1346,11 @@ if (extraUrls.length === 0) {
 
     try {
         const searchResults =
-            await searchEvergreenPages(
-                hostname,
-                language
-            )
+    await searchEvergreenPages(
+        hostname,
+        language,
+        locale
+    )
 
         searchPreview =
             searchResults
