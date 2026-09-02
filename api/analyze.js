@@ -167,6 +167,9 @@ function scoreEvergreenUrl(url) {
         "/jobs/",
         "/support/",
         "/help/",
+        "/resources/",
+"/resource/",
+"/customer-service/",
     ]
 
     if (
@@ -289,6 +292,160 @@ if (
         score,
         kind,
     }
+}
+
+function inferSiteType(markdown, links = []) {
+    const paths = links
+        .map((item) => {
+            const url =
+                typeof item === "string"
+                    ? item
+                    : item?.url
+
+            if (!url) {
+                return ""
+            }
+
+            try {
+                return new URL(url)
+                    .pathname
+                    .toLowerCase()
+            } catch {
+                return ""
+            }
+        })
+        .filter(Boolean)
+
+    const count = (pattern) =>
+        paths.filter((path) =>
+            pattern.test(path)
+        ).length
+
+    let mediaScore =
+        count(
+            /\/(?:article|articles|news)\//i
+        ) * 3 +
+        count(/\/20\d{2}\//i) * 2 +
+        count(
+            /_\d{5,}_\d+\.html$/i
+        ) * 3
+
+    let ecommerceScore =
+        count(
+            /\/(?:shop|products|collections?|cart|checkout|category|categories|cat|rooms)\//i
+        ) * 2
+
+    let saasScore =
+        count(
+            /\/(?:features?|pricing|integrations?|developers?|docs?|api|platform|solutions?)(?:\/|$)/i
+        ) * 2 +
+        count(/\/product(?:\/|$)/i)
+
+    const text =
+        String(markdown || "")
+            .toLowerCase()
+            .slice(0, 12000)
+
+    if (
+        /\b(add to cart|shopping bag|panier|ajouter au panier|checkout)\b/i.test(
+            text
+        )
+    ) {
+        ecommerceScore += 5
+    }
+
+    if (
+        /\b(api|workspace|workflow|software|platform|developer)\b/i.test(
+            text
+        )
+    ) {
+        saasScore += 3
+    }
+
+    if (
+        /\b(journal|journalisme|news|article|reportage|chronique)\b/i.test(
+            text
+        )
+    ) {
+        mediaScore += 3
+    }
+
+    if (
+        mediaScore >= 8 &&
+        mediaScore > ecommerceScore &&
+        mediaScore > saasScore
+    ) {
+        return "media"
+    }
+
+    if (
+        ecommerceScore >= 6 &&
+        ecommerceScore >= saasScore
+    ) {
+        return "ecommerce"
+    }
+
+    if (saasScore >= 4) {
+        return "saas"
+    }
+
+    return "other"
+}
+
+function isProductEvidenceUrl(
+    url,
+    siteType
+) {
+    let path = ""
+
+    try {
+        path =
+            new URL(url)
+                .pathname
+                .toLowerCase()
+    } catch {
+        return false
+    }
+
+    if (siteType === "media") {
+        return false
+    }
+
+    if (siteType === "ecommerce") {
+        return (
+            pathContains(
+                path,
+                "product"
+            ) ||
+            pathContains(
+                path,
+                "products"
+            )
+        )
+    }
+
+    if (siteType === "saas") {
+        const normalized =
+            path.replace(/\/+$/, "")
+
+        return (
+            normalized.endsWith(
+                "/product"
+            ) ||
+            normalized.endsWith(
+                "/products"
+            ) ||
+            pathContains(
+                path,
+                "platform"
+            )
+        )
+    }
+
+    return (
+        scoreEvergreenUrl(url).kind ===
+        "offering"
+    )
 }
 
 function selectEvergreenPages(
@@ -506,7 +663,8 @@ function selectEvergreenPages(
 async function searchEvergreenPages(
     hostname,
     language = "en",
-    locale = "en-US"
+    locale = "en-US",
+    siteType = "other"
 ) {
     let searchCountry = null
 
@@ -517,20 +675,55 @@ async function searchEvergreenPages(
     } catch {
         searchCountry = null
     }
+
     const brandHint =
         hostname
             .split(".")[0]
             .replace(/-/g, " ")
 
-    const productQuery =
-        language === "fr"
-            ? `${brandHint} produits best-sellers pièces iconiques pièces phares pièces signature`
-            : `${brandHint} products best sellers iconic products flagship products signature products`
+    let productQuery = null
+    let identityQuery = null
 
-    const identityQuery =
-        language === "fr"
-            ? `${brandHint} histoire marque mission valeurs savoir-faire`
-            : `${brandHint} brand story mission values heritage`
+    if (siteType === "ecommerce") {
+        productQuery =
+            language === "fr"
+                ? `${brandHint} produits iconiques produits signature best-sellers collections permanentes`
+                : `${brandHint} iconic products signature products best sellers permanent collections`
+
+        identityQuery =
+            language === "fr"
+                ? `${brandHint} histoire marque mission valeurs savoir-faire`
+                : `${brandHint} brand story mission values heritage`
+    } else if (
+        siteType === "saas"
+    ) {
+        productQuery =
+            language === "fr"
+                ? `${brandHint} produits plateforme modules produits principaux offres principales`
+                : `${brandHint} products platform modules core products main offerings`
+
+        identityQuery =
+            language === "fr"
+                ? `${brandHint} entreprise histoire mission plateforme`
+                : `${brandHint} company history mission platform`
+    } else if (
+        siteType === "media"
+    ) {
+        identityQuery =
+            language === "fr"
+                ? `${brandHint} histoire journal mission rédaction charte éditoriale`
+                : `${brandHint} publication history mission newsroom editorial standards`
+    } else {
+        productQuery =
+            language === "fr"
+                ? `${brandHint} produits services offres principales`
+                : `${brandHint} products services main offerings`
+
+        identityQuery =
+            language === "fr"
+                ? `${brandHint} histoire marque mission valeurs`
+                : `${brandHint} brand story mission values`
+    }
 
     async function runSearch(
         query,
@@ -542,31 +735,26 @@ async function searchEvergreenPages(
                 method: "POST",
 
                 headers: {
-                    Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+                    Authorization:
+                        `Bearer ${process.env.FIRECRAWL_API_KEY}`,
                     "Content-Type":
                         "application/json",
                 },
 
-            body: JSON.stringify({
-    query,
-
-    sources: ["web"],
-
-    includeDomains: [
-        hostname,
-    ],
-
-    country:
-        searchCountry ||
-        undefined,
-
-    limit,
-
-    ignoreInvalidURLs:
-        true,
-
-    timeout: 30000,
-}),
+                body: JSON.stringify({
+                    query,
+                    sources: ["web"],
+                    includeDomains: [
+                        hostname,
+                    ],
+                    country:
+                        searchCountry ||
+                        undefined,
+                    limit,
+                    ignoreInvalidURLs:
+                        true,
+                    timeout: 30000,
+                }),
             }
         )
 
@@ -597,17 +785,16 @@ async function searchEvergreenPages(
         return data.data?.web || []
     }
 
-    // On cherche les produits séparément
-    // pour éviter que les pages corporate
-    // monopolisent les résultats.
     const [
-        productResults,
-        identityResults,
+        rawProductResults,
+        rawIdentityResults,
     ] = await Promise.all([
-        runSearch(
-            productQuery,
-            10
-        ),
+        productQuery
+            ? runSearch(
+                  productQuery,
+                  10
+              )
+            : Promise.resolve([]),
 
         runSearch(
             identityQuery,
@@ -615,11 +802,27 @@ async function searchEvergreenPages(
         ),
     ])
 
+    const productResults =
+        rawProductResults.map(
+            (item) => ({
+                ...item,
+                discoveryKind:
+                    "product",
+            })
+        )
+
+    const identityResults =
+        rawIdentityResults.map(
+            (item) => ({
+                ...item,
+                discoveryKind:
+                    "identity",
+            })
+        )
+
     const merged = []
     const seen = new Set()
 
-    // Produits en premier pour que searchPreview
-    // soit particulièrement utile au debug.
     for (const item of [
         ...productResults,
         ...identityResults,
@@ -643,6 +846,7 @@ async function searchEvergreenPages(
 
     return merged
 }
+
 async function scrapePage(
     url,
     includeLinks = false
@@ -1273,7 +1477,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-29:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-30:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
