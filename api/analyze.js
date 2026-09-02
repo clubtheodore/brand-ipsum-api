@@ -1052,7 +1052,7 @@ Infer internally:
 ecommerce | media | saas | other.
 
 PRIORITIZE
-- iconic slogans, symbols and recurring concepts
+- official slogans, taglines, symbols and distinctive brand marks
 - signature products and core services
 - named people strongly tied to the brand
 - meaningful places
@@ -1086,8 +1086,9 @@ It is NOT a brand summary.
 Choose lexical units that make the text immediately and recognizably belong to this specific brand.
 
 ICONIC
-- include only official slogans, taglines, symbols, nicknames and established recurring brand expressions
-- preserve them exactly and completely as written
+- include only official slogans, taglines, mottos, symbols and established brand nicknames- preserve them exactly and completely as written
+- recurring descriptive copy is NOT iconic, even when it appears repeatedly across the website
+- words such as "iconic", "signature" or "flagship" describing products do not make the surrounding sentence an iconic brand expression
 - official slogans and taglines may be any length
 - never shorten, rewrite or split them
 - product names NEVER belong in iconic
@@ -1258,7 +1259,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-21:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-22:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
