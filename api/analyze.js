@@ -1244,7 +1244,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-19:${locale.toLowerCase()}:${hostname}
+    `brand-ipsum:v3-19:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
