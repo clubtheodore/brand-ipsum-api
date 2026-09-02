@@ -424,23 +424,42 @@ function isProductEvidenceUrl(
         )
     }
 
-    if (siteType === "saas") {
-        const normalized =
-            path.replace(/\/+$/, "")
+   if (siteType === "saas") {
+    const normalized =
+        path.replace(/\/+$/, "")
 
-        return (
-            normalized.endsWith(
-                "/product"
-            ) ||
-            normalized.endsWith(
-                "/products"
-            ) ||
-            pathContains(
-                path,
-                "platform"
-            )
+    const rejectedSaasPaths = [
+        "/templates/",
+        "/template/",
+        "/marketplace/",
+        "/help/",
+        "/guides/",
+        "/blog/",
+        "/resources/",
+    ]
+
+    if (
+        rejectedSaasPaths.some(
+            (pattern) =>
+                path.includes(pattern)
         )
+    ) {
+        return false
     }
+
+    return (
+        normalized.endsWith(
+            "/product"
+        ) ||
+        normalized.endsWith(
+            "/products"
+        ) ||
+        pathContains(
+            path,
+            "platform"
+        )
+    )
+}
 
     return (
         scoreEvergreenUrl(url).kind ===
@@ -1477,7 +1496,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-31:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-32:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
