@@ -988,13 +988,15 @@ It is NOT a brand summary.
 Choose lexical units that make the text immediately and recognizably belong to this specific brand.
 
 ICONIC
-- include only official slogans, taglines, symbols, nicknames and established named brand expressions
+- include only official slogans, taglines, symbols, nicknames and established recurring brand expressions
 - preserve them exactly and completely as written
 - official slogans and taglines may be any length
 - never shorten, rewrite or split them
-- product names NEVER belong in iconic, even when the product is described as iconic, signature or flagship
-- descriptive marketing sentences are not iconic unless the brand clearly presents them as a slogan, tagline or established recurring expression
-- if evidence is weak, return fewer iconic terms
+- product names NEVER belong in iconic
+- do NOT include descriptive marketing sentences, editorial copy or value propositions
+- a sentence is iconic only if the brand clearly uses it as an official slogan, tagline, motto or recurring signature expression
+- appearing in multiple search snippets does not by itself make a phrase iconic
+- when evidence is weak, leave iconic empty rather than filling it with descriptive copy
 
 PRODUCTS
 - include only named products, services or collections owned and offered by the brand
@@ -1133,7 +1135,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-14:${language}:${hostname}`
+    `brand-ipsum:v3-15:${language}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
