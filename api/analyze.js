@@ -1371,28 +1371,26 @@ ${websiteContext}
         // --------------------------------
 
         return res.status(200).json({
-            brand,
+    brand,
 
-meta: {
-    source: "fresh",
+    meta: {
+        source: "fresh",
+        version: "v3",
+        hostname,
+        pagesUsed,
 
-    version: "v3",
-
-    hostname,
-
-    pagesUsed,
-
-   discovery: {
-    source: discoverySource,
-    homepageLinks:
-        homepage.links.length,
-    mappedLinks:
-        mappedLinksCount,
-    selectedPages:
-        extraUrls,
-    searchPreview,
-},
-
+        discovery: {
+            source: discoverySource,
+            homepageLinks:
+                homepage.links.length,
+            mappedLinks:
+                mappedLinksCount,
+            selectedPages:
+                extraUrls,
+            searchPreview,
+        },
+    },
+})
     contextChars:
         websiteContext.length,
 
