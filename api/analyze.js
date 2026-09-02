@@ -1123,7 +1123,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-11:${language}:${hostname}`
+    `brand-ipsum:v3-12:${language}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
