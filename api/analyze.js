@@ -1202,8 +1202,26 @@ export default async function handler(
 
         const {
     url,
-    language = "en",
+    language: requestedLanguage,
+    locale: requestedLocale,
 } = req.body || {}
+
+const locale =
+    typeof requestedLocale === "string" &&
+    requestedLocale.trim()
+        ? requestedLocale.trim()
+        : "en-US"
+
+const language =
+    typeof requestedLanguage === "string" &&
+    requestedLanguage.trim()
+        ? requestedLanguage
+              .trim()
+              .toLowerCase()
+              .split("-")[0]
+        : locale
+              .toLowerCase()
+              .split("-")[0]
 
         if (!url) {
             return res.status(400).json({
@@ -1226,7 +1244,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-18:${language}:${hostname}`
+    `brand-ipsum:v3-19:${locale.toLowerCase()}:${hostname}
 
         // --------------------------------
         // 1. CACHE REDIS
