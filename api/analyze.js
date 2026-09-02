@@ -1123,7 +1123,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-12:${language}:${hostname}`
+    `brand-ipsum:v3-13:${language}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1310,7 +1310,34 @@ if (extraUrls.length === 0) {
                     )
             }
         )
+if (searchPreview.length > 0) {
+    websiteContext += `
+### SEARCH DISCOVERY EVIDENCE
 
+The following search snippets are secondary evidence.
+Use them especially to identify:
+- signature or iconic products
+- flagship products
+- recurring brand expressions
+- official localized product names
+
+Do not treat a temporary article subject as a durable brand term
+unless the snippet explicitly identifies it as signature, iconic,
+flagship, enduring or a best-seller.
+
+${searchPreview
+    .slice(0, 10)
+    .map(
+        (item, index) => `
+[${index + 1}]
+TITLE: ${item.title}
+URL: ${item.url}
+SNIPPET: ${item.description}
+`
+    )
+    .join("\n")}
+`
+}
         // --------------------------------
         // 6. UN SEUL APPEL OPENAI
         // --------------------------------
