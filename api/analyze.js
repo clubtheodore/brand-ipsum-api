@@ -285,10 +285,45 @@ function scoreEvergreenUrl(url) {
 function selectEvergreenPages(
     links,
     hostname,
-    homepageUrl
+    homepageUrl,
+    language = "en"
 ) {
     const homepage =
         homepageUrl.replace(/\/$/, "")
+
+    const targetLanguage =
+        String(language)
+            .toLowerCase()
+            .split("-")[0]
+
+    function getExplicitUrlLanguage(url) {
+        try {
+            const segments =
+                new URL(url).pathname
+                    .toLowerCase()
+                    .split("/")
+                    .filter(Boolean)
+
+            let first =
+                segments[0] || ""
+
+            if (first === "global") {
+                first =
+                    segments[1] || ""
+            }
+
+            const match =
+                first.match(
+                    /^([a-z]{2})(?:-[a-z]{2})?$/
+                )
+
+            return match
+                ? match[1]
+                : null
+        } catch {
+            return null
+        }
+    }
 
     const candidates = links
         .map((item) => {
@@ -308,7 +343,8 @@ function selectEvergreenPages(
         .filter(Boolean)
         .map((url) => {
             try {
-                const parsed = new URL(url)
+                const parsed =
+                    new URL(url)
 
                 parsed.hash = ""
                 parsed.search = ""
@@ -328,16 +364,52 @@ function selectEvergreenPages(
                 homepage
         )
 
-    const unique = [...new Set(candidates)]
+    const unique =
+        [...new Set(candidates)]
+
+    // Si on a réellement trouvé au moins
+    // une URL dans la langue demandée,
+    // on pénalise fortement les autres langues.
+    // Sinon, on les conserve comme fallback.
+    const hasTargetLanguageUrl =
+        unique.some(
+            (url) =>
+                getExplicitUrlLanguage(
+                    url
+                ) === targetLanguage
+        )
 
     const scored = unique
         .map((url) => {
             const result =
                 scoreEvergreenUrl(url)
 
+            const urlLanguage =
+                getExplicitUrlLanguage(
+                    url
+                )
+
+            let languageScore = 0
+
+            if (
+                urlLanguage ===
+                targetLanguage
+            ) {
+                languageScore = 25
+            } else if (
+                hasTargetLanguageUrl &&
+                urlLanguage &&
+                urlLanguage !==
+                    targetLanguage
+            ) {
+                languageScore = -40
+            }
+
             return {
                 url,
-                score: result.score,
+                score:
+                    result.score +
+                    languageScore,
                 kind: result.kind,
             }
         })
@@ -346,13 +418,22 @@ function selectEvergreenPages(
                 item.score >=
                 MIN_EXTRA_PAGE_SCORE
         )
-       .sort((a, b) => {
-    if (b.score !== a.score) {
-        return b.score - a.score
-    }
+        .sort((a, b) => {
+            if (
+                b.score !==
+                a.score
+            ) {
+                return (
+                    b.score -
+                    a.score
+                )
+            }
 
-    return getPathDepth(a.url) - getPathDepth(b.url)
-})
+            return (
+                getPathDepth(a.url) -
+                getPathDepth(b.url)
+            )
+        })
 
     const selected = []
 
@@ -372,13 +453,15 @@ function selectEvergreenPages(
             item.kind === "offering" &&
             !selected.some(
                 (selectedItem) =>
-                    selectedItem.url === item.url
+                    selectedItem.url ===
+                    item.url
             )
     )
 
     if (
         offering &&
-        selected.length < MAX_EXTRA_PAGES
+        selected.length <
+            MAX_EXTRA_PAGES
     ) {
         selected.push(offering)
     }
@@ -396,7 +479,8 @@ function selectEvergreenPages(
         if (
             !selected.some(
                 (item) =>
-                    item.url === candidate.url
+                    item.url ===
+                    candidate.url
             )
         ) {
             selected.push(candidate)
@@ -1142,7 +1226,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-17:${language}:${hostname}`
+    `brand-ipsum:v3-18:${language}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1217,7 +1301,8 @@ let extraUrls =
     selectEvergreenPages(
         homepage.links,
         hostname,
-        homepageUrl
+        homepageUrl,
+        language
     )
 
 // Si la homepage ne révèle aucune bonne page evergreen,
@@ -1250,12 +1335,13 @@ description:
         mappedLinksCount =
             searchResults.length
 
-        extraUrls =
-            selectEvergreenPages(
-                searchResults,
-                hostname,
-                homepageUrl
-            )
+       extraUrls =
+    selectEvergreenPages(
+        searchResults,
+        hostname,
+        homepageUrl,
+        language
+    )
     } catch (error) {
         discoverySource =
             "search-error"
