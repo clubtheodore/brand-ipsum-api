@@ -408,7 +408,15 @@ function selectEvergreenPages(
     )
 }
 
-async function searchEvergreenPages(hostname) {
+async function searchEvergreenPages(
+    hostname,
+    language = "en"
+) {
+    const searchQuery =
+        language === "fr"
+            ? "histoire marque mission valeurs produits iconiques produits phares best-sellers savoir-faire"
+            : "brand story mission values iconic products signature products flagship best sellers heritage"
+
     const response = await fetch(
         "https://api.firecrawl.dev/v2/search",
         {
@@ -420,8 +428,7 @@ async function searchEvergreenPages(hostname) {
             },
 
             body: JSON.stringify({
-                query:
-                    "about company history heritage mission values vision our business how we work brand",
+                query: searchQuery,
 
                 sources: ["web"],
 
@@ -434,6 +441,33 @@ async function searchEvergreenPages(hostname) {
                 timeout: 30000,
             }),
         }
+    )
+
+    const rawText =
+        await response.text()
+
+    let data = null
+
+    try {
+        data = JSON.parse(rawText)
+    } catch {
+        throw new Error(
+            `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
+        )
+    }
+
+    if (
+        !response.ok ||
+        !data?.success
+    ) {
+        throw new Error(
+            data?.error ||
+                `Firecrawl search failed (${response.status})`
+        )
+    }
+
+    return data.data?.web || []
+}
     )
 
     const rawText = await response.text()
@@ -917,9 +951,16 @@ ICONIC
 - only include expressions that are genuinely distinctive to the brand
 
 PRODUCTS
-- preserve complete official product or service names
+- include only named products, services or collections owned and offered by the brand
+- preserve complete official product or service names exactly as written
 - product names may exceed 2 words
 - favor signature, enduring or highly recognizable products over temporary releases
+- exclude materials, components, specifications and construction details
+- exclude supplier brands and third-party technologies
+- exclude certifications and standards
+- exclude processes, production methods and business models
+- an item used inside a product is not itself a product
+- when a component or material is distinctive and useful, place it in vocabulary or everyday instead; otherwise omit it
 
 PEOPLE
 - named individuals only
@@ -1123,7 +1164,10 @@ if (extraUrls.length === 0) {
 
     try {
         const searchResults =
-            await searchEvergreenPages(hostname)
+    await searchEvergreenPages(
+        hostname,
+        language
+    )
 
         mappedLinksCount =
             searchResults.length
