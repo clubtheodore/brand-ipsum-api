@@ -1389,30 +1389,29 @@ ${websiteContext}
                 extraUrls,
             searchPreview,
         },
+
+        contextChars:
+            websiteContext.length,
+
+        usage: {
+            inputTokens:
+                response.usage
+                    ?.input_tokens ??
+                null,
+
+            cachedTokens:
+                response.usage
+                    ?.input_tokens_details
+                    ?.cached_tokens ??
+                0,
+
+            outputTokens:
+                response.usage
+                    ?.output_tokens ??
+                null,
+        },
     },
 })
-    contextChars:
-        websiteContext.length,
-
-    usage: {
-        inputTokens:
-            response.usage
-                ?.input_tokens ??
-            null,
-
-        cachedTokens:
-            response.usage
-                ?.input_tokens_details
-                ?.cached_tokens ??
-            0,
-
-        outputTokens:
-            response.usage
-                ?.output_tokens ??
-            null,
-    },
-},
-        })
     } catch (error) {
         console.error(
             "Brand Ipsum API error:",
