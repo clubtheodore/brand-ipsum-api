@@ -1244,7 +1244,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-19:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-20:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1269,18 +1269,20 @@ const language =
                                 cachedBrand,
 
                             meta: {
-                                source:
-                                    "cache",
+    source:
+        "cache",
 
-                                hostname,
+    hostname,
+    language,
+    locale,
 
-                                version:
-                                    "v3",
+    version:
+        "v3",
 
-                                pagesUsed:
-                                    cached.pagesUsed ||
-                                    [],
-                            },
+    pagesUsed:
+        cached.pagesUsed ||
+        [],
+},
                         })
                 }
             } catch (error) {
@@ -1569,10 +1571,12 @@ ${websiteContext}
     brand,
 
     meta: {
-        source: "fresh",
-        version: "v3",
-        hostname,
-        pagesUsed,
+    source: "fresh",
+    version: "v3",
+    hostname,
+    language,
+    locale,
+    pagesUsed,
 
         discovery: {
             source: discoverySource,
