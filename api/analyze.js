@@ -1477,7 +1477,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-30:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-31:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1541,7 +1541,12 @@ const language =
                 "No usable homepage content found"
             )
         }
-
+const siteType =
+    inferSiteType(
+        homepage.markdown,
+        homepage.links
+    )
+        
         // --------------------------------
         // 3. CHOIX DES PAGES EVERGREEN
         // --------------------------------
@@ -1558,11 +1563,12 @@ let searchResults = []
 // systématiquement la discovery.
 try {
     searchResults =
-        await searchEvergreenPages(
-            hostname,
-            language,
-            locale
-        )
+    await searchEvergreenPages(
+        hostname,
+        language,
+        locale,
+        siteType
+    )
 
     mappedLinksCount =
         searchResults.length
@@ -1661,14 +1667,15 @@ let extraUrls =
 
         usableExtraPages.forEach(
             (page, index) => {
-                const pageKind =
-                    scoreEvergreenUrl(
-                        page.url
-                    ).kind
+                const pageIsProductEvidence =
+    isProductEvidenceUrl(
+        page.url,
+        siteType
+    )
 
                 const formattedPage =
                     formatPageForPrompt(
-                        pageKind === "offering"
+                        pageIsProductEvidence
                             ? `Product evidence page ${index + 1}`
                             : `Evergreen page ${index + 1}`,
                         page.url,
@@ -1677,7 +1684,7 @@ let extraUrls =
                     )
 
                 if (
-                    pageKind === "offering"
+                    pageIsProductEvidence
                 ) {
                     productEvidence +=
                         formattedPage
@@ -1688,18 +1695,25 @@ let extraUrls =
             }
         )
 
-        const productSearchEvidence =
-            searchPreview
-                .filter((item) => {
-                    const url =
-                        item.url || ""
+const productSearchEvidence =
+    searchPreview
+        .filter((item) => {
+            const url =
+                item.url || ""
 
-                    return !(
-                        url.includes("-stock") ||
-                        url.includes("/stock/")
-                    )
-                })
-                .slice(0, 10)
+            if (
+                url.includes("-stock") ||
+                url.includes("/stock/")
+            ) {
+                return false
+            }
+
+            return isProductEvidenceUrl(
+                url,
+                siteType
+            )
+        })
+        .slice(0, 10)
 
         if (
             productSearchEvidence.length > 0
