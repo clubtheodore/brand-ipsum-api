@@ -1123,6 +1123,9 @@ PRODUCTS
 - fewer highly distinctive products are better than a full list of generic or temporary products
 - a product appearing on a scraped product page is not automatically a signature product
 - when the requested language is available for signature product names, do not add foreign-language equivalents or unrelated foreign-language products merely to fill the category
+- for ecommerce brands, a product mentioned only on the homepage is weak evidence because homepages often reflect the current assortment
+- do not include homepage-only products when stronger evidence identifies signature, flagship, iconic, permanent or enduring products
+- once strong signature-product evidence exists, only add another product if there is similarly strong evidence that it is durable and brand-distinctive
 
 PEOPLE
 - named individuals only
@@ -1268,7 +1271,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-25:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-26:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
