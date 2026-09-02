@@ -1268,7 +1268,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-23:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-24:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1468,13 +1468,21 @@ if (searchPreview.length > 0) {
 
 The following search snippets are secondary evidence.
 Use them especially to identify:
-- signature or iconic products
+- signature products
 - flagship products
-- recurring brand expressions
+- enduring or best-selling products
 - official localized product names
 
+Search snippets must NOT be used to infer slogans, taglines,
+mottos or iconic brand expressions merely because wording
+appears repeatedly.
+
+Only treat wording as iconic when the evidence explicitly
+identifies it as an official slogan, tagline, motto, symbol
+or established brand nickname.
+
 Do not treat a temporary article subject as a durable brand term
-unless the snippet explicitly identifies it as signature, iconic,
+unless the snippet explicitly identifies it as signature,
 flagship, enduring or a best-seller.
 
 ${searchPreview
