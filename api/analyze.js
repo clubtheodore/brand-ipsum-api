@@ -572,6 +572,43 @@ function cleanMarkdown(markdown) {
     return cleaned.join("\n")
 }
 
+function truncateCleanly(
+    text,
+    maxChars
+) {
+    if (text.length <= maxChars) {
+        return text
+    }
+
+    const chunk =
+        text.slice(0, maxChars)
+
+    // On privilégie la fin d'une ligne complète.
+    const lastLineBreak =
+        chunk.lastIndexOf("\n")
+
+    if (
+        lastLineBreak >
+        maxChars * 0.8
+    ) {
+        return chunk
+            .slice(0, lastLineBreak)
+            .trim()
+    }
+
+    // Sinon au minimum, jamais au milieu d'un mot.
+    const lastSpace =
+        chunk.lastIndexOf(" ")
+
+    if (lastSpace > 0) {
+        return chunk
+            .slice(0, lastSpace)
+            .trim()
+    }
+
+    return chunk.trim()
+}
+
 function formatPageForPrompt(
     label,
     url,
@@ -581,11 +618,17 @@ function formatPageForPrompt(
     const cleaned =
         cleanMarkdown(markdown)
 
+    const truncated =
+        truncateCleanly(
+            cleaned,
+            maxChars
+        )
+
     return `
 ### ${label}
 URL: ${url}
 
-${cleaned.slice(0, maxChars)}
+${truncated}
 `
 }
 
