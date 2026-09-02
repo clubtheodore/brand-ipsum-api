@@ -468,29 +468,7 @@ async function searchEvergreenPages(
 
     return data.data?.web || []
 }
-    )
 
-    const rawText = await response.text()
-
-    let data = null
-
-    try {
-        data = JSON.parse(rawText)
-    } catch {
-        throw new Error(
-            `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
-        )
-    }
-
-    if (!response.ok || !data?.success) {
-        throw new Error(
-            data?.error ||
-                `Firecrawl search failed (${response.status})`
-        )
-    }
-
-    return data.data?.web || []
-}
 async function scrapePage(
     url,
     includeLinks = false
