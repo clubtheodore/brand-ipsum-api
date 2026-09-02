@@ -988,22 +988,27 @@ It is NOT a brand summary.
 Choose lexical units that make the text immediately and recognizably belong to this specific brand.
 
 ICONIC
-- preserve official slogans, taglines, symbols, nicknames and established brand expressions exactly as written
+- include only official slogans, taglines, symbols, nicknames and established named brand expressions
+- preserve them exactly and completely as written
 - official slogans and taglines may be any length
 - never shorten, rewrite or split them
-- only include expressions that are genuinely distinctive to the brand
+- product names NEVER belong in iconic, even when the product is described as iconic, signature or flagship
+- descriptive marketing sentences are not iconic unless the brand clearly presents them as a slogan, tagline or established recurring expression
+- if evidence is weak, return fewer iconic terms
 
 PRODUCTS
 - include only named products, services or collections owned and offered by the brand
-- preserve complete official product or service names exactly as written
-- product names may exceed 2 words
-- favor signature, enduring or highly recognizable products over temporary releases
+- strongly prioritize products explicitly described as signature, iconic, flagship, enduring, permanent or best-selling
+- when search evidence explicitly lists "signature products" or equivalent, classify those names under products, NOT iconic
+- preserve the complete official product name exactly as found in the evidence
+- never invent, translate, shorten or normalize a product name
+- if the same product appears in multiple languages, include it only once
+- when an official version matching the requested output language appears in the evidence, always prefer that exact localized version
 - exclude materials, components, specifications and construction details
 - exclude supplier brands and third-party technologies
 - exclude certifications and standards
 - exclude processes, production methods and business models
 - an item used inside a product is not itself a product
-- when a component or material is distinctive and useful, place it in vocabulary or everyday instead; otherwise omit it
 
 PEOPLE
 - named individuals only
@@ -1040,12 +1045,17 @@ GENERAL
 - never abbreviate, truncate or invent a term
 - preserve the source language
 - if evidence is weak, leave the category sparse rather than filling it with generic terms
+- each lexical item should belong to the single most appropriate category
+- never repeat the same concept across iconic and products
 
 LANGUAGE
-- use the requested output language for generic vocabulary, everyday terms and tone
-- preserve official slogans, product names, service names, people, places and proprietary terminology exactly as used by the brand
-- never translate an official brand expression just to match the output language
-- when equivalent official localized product names exist in the source, prefer the version matching the requested output language
+- use the requested output language for vocabulary, everyday terms and tone
+- generic descriptive terms should be translated into the requested output language
+- preserve official slogans, proprietary terminology, people and place names exactly when translation would alter their identity
+- product names must NEVER be translated by inference
+- when an official localized product name exists in the evidence, use that exact localized version
+- if both localized and foreign-language versions of the same product appear, keep only the version matching the requested output language
+- avoid mixing languages for generic vocabulary when a natural equivalent exists in the requested language
 `
 
 export default async function handler(
@@ -1123,7 +1133,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-13:${language}:${hostname}`
+    `brand-ipsum:v3-14:${language}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
