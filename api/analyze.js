@@ -376,22 +376,21 @@ function selectEvergreenPages(
     const unique =
         [...new Set(candidates)]
 
-    // Si on a réellement trouvé au moins
-    // une URL dans la langue demandée,
-    // on pénalise fortement les autres langues.
-    // Sinon, on les conserve comme fallback.
-    const hasTargetLanguageUrl =
-        unique.some(
-            (url) =>
-                getExplicitUrlLanguage(
-                    url
-                ) === targetLanguage
-        )
-
     const scored = unique
         .map((url) => {
             const result =
                 scoreEvergreenUrl(url)
+
+            // La langue peut départager
+            // de bonnes pages, mais ne doit
+            // jamais rendre une mauvaise page
+            // éligible.
+            if (
+                result.score <
+                MIN_EXTRA_PAGE_SCORE
+            ) {
+                return null
+            }
 
             const urlLanguage =
                 getExplicitUrlLanguage(
@@ -406,11 +405,13 @@ function selectEvergreenPages(
             ) {
                 languageScore = 25
             } else if (
-                hasTargetLanguageUrl &&
                 urlLanguage &&
                 urlLanguage !==
                     targetLanguage
             ) {
+                // Une langue étrangère
+                // explicitement indiquée
+                // est toujours pénalisée.
                 languageScore = -40
             }
 
@@ -422,6 +423,7 @@ function selectEvergreenPages(
                 kind: result.kind,
             }
         })
+        .filter(Boolean)
         .filter(
             (item) =>
                 item.score >=
@@ -456,7 +458,7 @@ function selectEvergreenPages(
         selected.push(identity)
     }
 
-    // 2. Puis éventuellement une page produit/core offer
+    // 2. Puis une page produit/core offer
     const offering = scored.find(
         (item) =>
             item.kind === "offering" &&
@@ -475,8 +477,8 @@ function selectEvergreenPages(
         selected.push(offering)
     }
 
-    // 3. Compléter uniquement si une autre page
-    // possède réellement un score suffisant
+    // 3. Compléter uniquement avec
+    // une autre bonne page si nécessaire
     for (const candidate of scored) {
         if (
             selected.length >=
@@ -1271,7 +1273,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-27:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-28:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1340,66 +1342,63 @@ const language =
         // 3. CHOIX DES PAGES EVERGREEN
         // --------------------------------
 
-let discoverySource = "homepage"
+let discoverySource =
+    "homepage+search"
+
 let mappedLinksCount = 0
 let searchPreview = []
+let searchResults = []
 
+// La homepage reste une source
+// de candidats, mais Search complète
+// systématiquement la discovery.
+try {
+    searchResults =
+        await searchEvergreenPages(
+            hostname,
+            language,
+            locale
+        )
+
+    mappedLinksCount =
+        searchResults.length
+
+    searchPreview =
+        searchResults
+            .slice(0, 10)
+            .map((item) => ({
+                title:
+                    item.title || "",
+                url:
+                    item.url || "",
+                description:
+                    truncateCleanly(
+                        item.description || "",
+                        600
+                    ),
+            }))
+} catch (error) {
+    discoverySource =
+        "homepage+search-error"
+
+    console.error(
+        "Firecrawl search failed:",
+        error
+    )
+}
+
+// Les liens de homepage et les résultats
+// Search sont maintenant évalués ensemble.
 let extraUrls =
     selectEvergreenPages(
-        homepage.links,
+        [
+            ...homepage.links,
+            ...searchResults,
+        ],
         hostname,
         homepageUrl,
         language
     )
-
-// Si la homepage ne révèle aucune bonne page evergreen,
-// on utilise Firecrawl Search comme fallback.
-if (extraUrls.length === 0) {
-    discoverySource = "search"
-
-    try {
-        const searchResults =
-    await searchEvergreenPages(
-        hostname,
-        language,
-        locale
-    )
-
-        searchPreview =
-            searchResults
-                .slice(0, 10)
-                .map((item) => ({
-                    title:
-                        item.title || "",
-                    url:
-                        item.url || "",
-description:
-    truncateCleanly(
-        item.description || "",
-        600
-    ),
-                }))
-
-        mappedLinksCount =
-            searchResults.length
-
-       extraUrls =
-    selectEvergreenPages(
-        searchResults,
-        hostname,
-        homepageUrl,
-        language
-    )
-    } catch (error) {
-        discoverySource =
-            "search-error"
-
-        console.error(
-            "Firecrawl search fallback failed:",
-            error
-        )
-    }
-}
 
         // --------------------------------
         // 4. SCRAPE MAX 2 PAGES
