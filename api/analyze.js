@@ -412,63 +412,128 @@ async function searchEvergreenPages(
     hostname,
     language = "en"
 ) {
-    const searchQuery =
+    const brandHint =
+        hostname
+            .split(".")[0]
+            .replace(/-/g, " ")
+
+    const productQuery =
         language === "fr"
-            ? "histoire marque mission valeurs produits iconiques produits phares best-sellers savoir-faire"
-            : "brand story mission values iconic products signature products flagship best sellers heritage"
+            ? `${brandHint} produits best-sellers pièces iconiques pièces phares pièces signature`
+            : `${brandHint} products best sellers iconic products flagship products signature products`
 
-    const response = await fetch(
-        "https://api.firecrawl.dev/v2/search",
-        {
-            method: "POST",
+    const identityQuery =
+        language === "fr"
+            ? `${brandHint} histoire marque mission valeurs savoir-faire`
+            : `${brandHint} brand story mission values heritage`
 
-            headers: {
-                Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
-                "Content-Type": "application/json",
-            },
-
-            body: JSON.stringify({
-                query: searchQuery,
-
-                sources: ["web"],
-
-                includeDomains: [hostname],
-
-                limit: 10,
-
-                ignoreInvalidURLs: true,
-
-                timeout: 30000,
-            }),
-        }
-    )
-
-    const rawText =
-        await response.text()
-
-    let data = null
-
-    try {
-        data = JSON.parse(rawText)
-    } catch {
-        throw new Error(
-            `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
-        )
-    }
-
-    if (
-        !response.ok ||
-        !data?.success
+    async function runSearch(
+        query,
+        limit
     ) {
-        throw new Error(
-            data?.error ||
-                `Firecrawl search failed (${response.status})`
+        const response = await fetch(
+            "https://api.firecrawl.dev/v2/search",
+            {
+                method: "POST",
+
+                headers: {
+                    Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+                    "Content-Type":
+                        "application/json",
+                },
+
+                body: JSON.stringify({
+                    query,
+
+                    sources: ["web"],
+
+                    includeDomains: [
+                        hostname,
+                    ],
+
+                    limit,
+
+                    ignoreInvalidURLs:
+                        true,
+
+                    timeout: 30000,
+                }),
+            }
         )
+
+        const rawText =
+            await response.text()
+
+        let data = null
+
+        try {
+            data =
+                JSON.parse(rawText)
+        } catch {
+            throw new Error(
+                `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
+            )
+        }
+
+        if (
+            !response.ok ||
+            !data?.success
+        ) {
+            throw new Error(
+                data?.error ||
+                    `Firecrawl search failed (${response.status})`
+            )
+        }
+
+        return data.data?.web || []
     }
 
-    return data.data?.web || []
-}
+    // On cherche les produits séparément
+    // pour éviter que les pages corporate
+    // monopolisent les résultats.
+    const [
+        productResults,
+        identityResults,
+    ] = await Promise.all([
+        runSearch(
+            productQuery,
+            10
+        ),
 
+        runSearch(
+            identityQuery,
+            6
+        ),
+    ])
+
+    const merged = []
+    const seen = new Set()
+
+    // Produits en premier pour que searchPreview
+    // soit particulièrement utile au debug.
+    for (const item of [
+        ...productResults,
+        ...identityResults,
+    ]) {
+        if (!item?.url) {
+            continue
+        }
+
+        const key =
+            item.url
+                .replace(/#.*$/, "")
+                .replace(/\/$/, "")
+
+        if (seen.has(key)) {
+            continue
+        }
+
+        seen.add(key)
+        merged.push(item)
+    }
+
+    return merged
+}
 async function scrapePage(
     url,
     includeLinks = false
@@ -1058,7 +1123,7 @@ export default async function handler(
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-10:${language}:${hostname}`
+    `brand-ipsum:v3-11:${language}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
