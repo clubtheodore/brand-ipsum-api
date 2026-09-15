@@ -1134,6 +1134,30 @@ function normalizeBrand(rawBrand) {
 if (!value) {
     continue
 }
+const wordCount =
+    value
+        .split(/\s+/)
+        .filter(Boolean)
+        .length
+
+// Garde-fou contre les sorties manifestement
+// corrompues ou concaténées par le modèle.
+if (
+    value.length > 120 ||
+    (
+        (
+            category === "vocabulary" ||
+            category === "everyday"
+        ) &&
+        wordCount > 8
+    ) ||
+    (
+        category === "tone" &&
+        wordCount > 2
+    )
+) {
+    continue
+}            
 
 const utilityPatterns = [
     /^free shipping$/i,
@@ -1498,7 +1522,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-33:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-34:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
