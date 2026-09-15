@@ -170,6 +170,8 @@ function scoreEvergreenUrl(url) {
         "/resources/",
 "/resource/",
 "/customer-service/",
+        "/templates/",
+"/template/",
     ]
 
     if (
@@ -1496,7 +1498,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-32:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-33:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
