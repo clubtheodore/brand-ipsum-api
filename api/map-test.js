@@ -50,19 +50,18 @@ export default async function handler(
                 },
 
                 body: JSON.stringify({
-                    url:
-                        "https://stripe.com",
-                    sitemap: "include",
-                    includeSubdomains:
-                        false,
-                    ignoreQueryParameters:
-                        true,
-                    limit: 100,
-                    timeout: 30000,
-                }),
-            }
-        )
-
+    url:
+        "https://stripe.com",
+    search:
+        "products payments billing platform",
+    sitemap: "include",
+    includeSubdomains:
+        false,
+    ignoreQueryParameters:
+        true,
+    limit: 100,
+    timeout: 30000,
+}),
         const rawText =
             await response.text()
 
