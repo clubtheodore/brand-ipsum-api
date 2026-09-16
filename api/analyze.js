@@ -1121,11 +1121,33 @@ async function searchEvergreenPages(
         merged.push(item)
     }
 
-    if (merged.length > 0) {
-        return merged
-    }
+    if (
+    siteType !== "media" &&
+    productResults.length === 0
+) {
+    const mapProductResults =
+        await runMapFallback()
 
-    return runMapFallback()
+    for (const item of mapProductResults) {
+        if (!item?.url) {
+            continue
+        }
+
+        const key =
+            item.url
+                .replace(/#.*$/, "")
+                .replace(/\/$/, "")
+
+        if (seen.has(key)) {
+            continue
+        }
+
+        seen.add(key)
+        merged.unshift(item)
+    }
+}
+
+return merged
 }
 
 async function scrapePage(
