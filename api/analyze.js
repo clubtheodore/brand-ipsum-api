@@ -772,10 +772,28 @@ async function searchEvergreenPages(
                 : `${brandHint} brand story mission values`
     }
 
-    async function runSearch(
-        query,
-        limit
+async function runSearch(
+    query,
+    limit
+) {
+    async function executeSearch(
+        searchQuery,
+        restrictDomain
     ) {
+        const body = {
+            query: searchQuery,
+            sources: ["web"],
+            limit,
+            ignoreInvalidURLs: true,
+            timeout: 30000,
+        }
+
+        if (restrictDomain) {
+            body.includeDomains = [
+                hostname,
+            ]
+        }
+
         const response = await fetch(
             "https://api.firecrawl.dev/v2/search",
             {
@@ -788,20 +806,67 @@ async function searchEvergreenPages(
                         "application/json",
                 },
 
-                body: JSON.stringify({
-                    query,
-                    sources: ["web"],
-                    includeDomains: [
-                        hostname,
-                    ],
-                    country: undefined,
-                    limit,
-                    ignoreInvalidURLs:
-                        true,
-                    timeout: 30000,
-                }),
+                body:
+                    JSON.stringify(body),
             }
         )
+
+        const rawText =
+            await response.text()
+
+        let data = null
+
+        try {
+            data =
+                JSON.parse(rawText)
+        } catch {
+            throw new Error(
+                `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
+            )
+        }
+
+        if (
+            !response.ok ||
+            !data?.success
+        ) {
+            throw new Error(
+                data?.error ||
+                    `Firecrawl search failed (${response.status})`
+            )
+        }
+
+        return data.data?.web || []
+    }
+
+    // 1. Recherche normale limitée au domaine.
+    const directResults =
+        await executeSearch(
+            query,
+            true
+        )
+
+    if (directResults.length > 0) {
+        return directResults
+    }
+
+    // 2. Si Firecrawl ne renvoie rien,
+    // on retente avec l'opérateur site:
+    // puis on vérifie nous-mêmes le domaine.
+    const fallbackResults =
+        await executeSearch(
+            `site:${hostname} ${query}`,
+            false
+        )
+
+    return fallbackResults.filter(
+        (item) =>
+            item?.url &&
+            sameDomain(
+                item.url,
+                hostname
+            )
+    )
+}
 
         const rawText =
             await response.text()
@@ -1557,7 +1622,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-37:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-38:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
