@@ -772,127 +772,96 @@ async function searchEvergreenPages(
                 : `${brandHint} brand story mission values`
     }
 
-async function runSearch(
-    query,
-    limit
-) {
-    async function executeSearch(
-        searchQuery,
-        restrictDomain
+    async function runSearch(
+        query,
+        limit
     ) {
-        const body = {
-            query: searchQuery,
-            sources: ["web"],
-            limit,
-            ignoreInvalidURLs: true,
-            timeout: 30000,
-        }
-
-        if (restrictDomain) {
-            body.includeDomains = [
-                hostname,
-            ]
-        }
-
-        const response = await fetch(
-            "https://api.firecrawl.dev/v2/search",
-            {
-                method: "POST",
-
-                headers: {
-                    Authorization:
-                        `Bearer ${process.env.FIRECRAWL_API_KEY}`,
-                    "Content-Type":
-                        "application/json",
-                },
-
-                body:
-                    JSON.stringify(body),
+        async function executeSearch(
+            searchQuery,
+            restrictDomain
+        ) {
+            const body = {
+                query: searchQuery,
+                sources: ["web"],
+                limit,
+                ignoreInvalidURLs: true,
+                timeout: 30000,
             }
+
+            if (restrictDomain) {
+                body.includeDomains = [
+                    hostname,
+                ]
+            }
+
+            const response = await fetch(
+                "https://api.firecrawl.dev/v2/search",
+                {
+                    method: "POST",
+
+                    headers: {
+                        Authorization:
+                            `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+                        "Content-Type":
+                            "application/json",
+                    },
+
+                    body:
+                        JSON.stringify(body),
+                }
+            )
+
+            const rawText =
+                await response.text()
+
+            let data = null
+
+            try {
+                data =
+                    JSON.parse(rawText)
+            } catch {
+                throw new Error(
+                    `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
+                )
+            }
+
+            if (
+                !response.ok ||
+                !data?.success
+            ) {
+                throw new Error(
+                    data?.error ||
+                        `Firecrawl search failed (${response.status})`
+                )
+            }
+
+            return data.data?.web || []
+        }
+
+        const directResults =
+            await executeSearch(
+                query,
+                true
+            )
+
+        if (directResults.length > 0) {
+            return directResults
+        }
+
+        const fallbackResults =
+            await executeSearch(
+                `site:${hostname} ${query}`,
+                false
+            )
+
+        return fallbackResults.filter(
+            (item) =>
+                item?.url &&
+                sameDomain(
+                    item.url,
+                    hostname
+                )
         )
-
-        const rawText =
-            await response.text()
-
-        let data = null
-
-        try {
-            data =
-                JSON.parse(rawText)
-        } catch {
-            throw new Error(
-                `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
-            )
-        }
-
-        if (
-            !response.ok ||
-            !data?.success
-        ) {
-            throw new Error(
-                data?.error ||
-                    `Firecrawl search failed (${response.status})`
-            )
-        }
-
-        return data.data?.web || []
-    }
-
-    // 1. Recherche normale limitée au domaine.
-    const directResults =
-        await executeSearch(
-            query,
-            true
-        )
-
-    if (directResults.length > 0) {
-        return directResults
-    }
-
-    // 2. Si Firecrawl ne renvoie rien,
-    // on retente avec l'opérateur site:
-    // puis on vérifie nous-mêmes le domaine.
-    const fallbackResults =
-        await executeSearch(
-            `site:${hostname} ${query}`,
-            false
-        )
-
-    return fallbackResults.filter(
-        (item) =>
-            item?.url &&
-            sameDomain(
-                item.url,
-                hostname
-            )
-    )
-}
-
-        const rawText =
-            await response.text()
-
-        let data = null
-
-        try {
-            data =
-                JSON.parse(rawText)
-        } catch {
-            throw new Error(
-                `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
-            )
-        }
-
-        if (
-            !response.ok ||
-            !data?.success
-        ) {
-            throw new Error(
-                data?.error ||
-                    `Firecrawl search failed (${response.status})`
-            )
-        }
-
-        return data.data?.web || []
     }
 
     const [
