@@ -878,7 +878,7 @@ async function searchEvergreenPages(
                         false,
                     ignoreQueryParameters:
                         true,
-                    limit: 200,
+                    limit: 5000,
                     timeout: 30000,
                 }),
             }
@@ -1804,7 +1804,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-40:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-41:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
