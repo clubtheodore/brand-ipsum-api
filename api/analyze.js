@@ -1048,6 +1048,34 @@ async function searchEvergreenPages(
                         "product",
                 }))
 
+console.log(
+    "MAP DEBUG",
+    JSON.stringify({
+        totalLinks:
+            Array.isArray(data.links)
+                ? data.links.length
+                : 0,
+
+        candidateCount:
+            candidates.length,
+
+        candidates:
+            candidates.map(
+                (item) => item.url
+            ),
+
+        sample:
+            (data.links || [])
+                .slice(0, 20)
+                .map((item) => ({
+                    url:
+                        item?.url || "",
+                    title:
+                        item?.title || "",
+                })),
+    })
+)
+        
         return candidates
     }
 
