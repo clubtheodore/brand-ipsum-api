@@ -396,7 +396,8 @@ function inferSiteType(markdown, links = []) {
 
 function isProductEvidenceUrl(
     url,
-    siteType
+    siteType,
+    discoveryKind = null
 ) {
     let path = ""
 
@@ -426,42 +427,65 @@ function isProductEvidenceUrl(
         )
     }
 
-   if (siteType === "saas") {
-    const normalized =
-        path.replace(/\/+$/, "")
+    if (siteType === "saas") {
+        const normalized =
+            path.replace(/\/+$/, "")
 
-    const rejectedSaasPaths = [
-        "/templates/",
-        "/template/",
-        "/marketplace/",
-        "/help/",
-        "/guides/",
-        "/blog/",
-        "/resources/",
-    ]
+        const rejectedSaasPaths = [
+            "/templates/",
+            "/template/",
+            "/marketplace/",
+            "/help/",
+            "/guides/",
+            "/blog/",
+            "/resources/",
+            "/pricing",
+        ]
 
-    if (
-        rejectedSaasPaths.some(
-            (pattern) =>
-                path.includes(pattern)
+        if (
+            rejectedSaasPaths.some(
+                (pattern) =>
+                    path.includes(pattern)
+            )
+        ) {
+            return false
+        }
+
+        const segments =
+            normalized
+                .split("/")
+                .filter(Boolean)
+
+        const isLocaleRoot =
+            segments.length === 0 ||
+            (
+                segments.length === 1 &&
+                /^[a-z]{2}(?:-[a-z]{2})?$/.test(
+                    segments[0]
+                )
+            )
+
+        if (isLocaleRoot) {
+            return false
+        }
+
+        if (discoveryKind === "product") {
+            return true
+        }
+
+        return (
+            normalized.endsWith(
+                "/product"
+            ) ||
+            normalized.endsWith(
+                "/products"
+            ) ||
+            pathContains(
+                path,
+                "platform"
+            )
         )
-    ) {
-        return false
     }
-
-    return (
-        normalized.endsWith(
-            "/product"
-        ) ||
-        normalized.endsWith(
-            "/products"
-        ) ||
-        pathContains(
-            path,
-            "platform"
-        )
-    )
-}
 
     return (
         scoreEvergreenUrl(url).kind ===
@@ -703,6 +727,7 @@ async function searchEvergreenPages(
             .replace(/-/g, " ")
 
     let productQuery = null
+    let secondaryProductQuery = null
     let identityQuery = null
 
     if (siteType === "ecommerce") {
@@ -715,21 +740,22 @@ async function searchEvergreenPages(
             language === "fr"
                 ? `${brandHint} histoire marque mission valeurs savoir-faire`
                 : `${brandHint} brand story mission values heritage`
-    } else if (
-        siteType === "saas"
-    ) {
+    } else if (siteType === "saas") {
         productQuery =
             language === "fr"
                 ? `${brandHint} produits plateforme modules produits principaux offres principales`
                 : `${brandHint} products platform modules core products main offerings`
 
+        secondaryProductQuery =
+            language === "en"
+                ? null
+                : `${brandHint} products platform core products product suite modules`
+
         identityQuery =
             language === "fr"
                 ? `${brandHint} entreprise histoire mission plateforme`
                 : `${brandHint} company history mission platform`
-    } else if (
-        siteType === "media"
-    ) {
+    } else if (siteType === "media") {
         identityQuery =
             language === "fr"
                 ? `${brandHint} histoire journal mission rédaction charte éditoriale`
@@ -808,11 +834,19 @@ async function searchEvergreenPages(
 
     const [
         rawProductResults,
+        rawSecondaryProductResults,
         rawIdentityResults,
     ] = await Promise.all([
         productQuery
             ? runSearch(
                   productQuery,
+                  10
+              )
+            : Promise.resolve([]),
+
+        secondaryProductQuery
+            ? runSearch(
+                  secondaryProductQuery,
                   10
               )
             : Promise.resolve([]),
@@ -824,7 +858,10 @@ async function searchEvergreenPages(
     ])
 
     const productResults =
-        rawProductResults.map(
+        [
+            ...rawProductResults,
+            ...rawSecondaryProductResults,
+        ].map(
             (item) => ({
                 ...item,
                 discoveryKind:
@@ -1522,7 +1559,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-35:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-36:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
@@ -1619,19 +1656,21 @@ try {
         searchResults.length
 
     searchPreview =
-        searchResults
-            .slice(0, 10)
-            .map((item) => ({
-                title:
-                    item.title || "",
-                url:
-                    item.url || "",
-                description:
-                    truncateCleanly(
-                        item.description || "",
-                        600
-                    ),
-            }))
+    searchResults
+        .slice(0, 10)
+        .map((item) => ({
+            title:
+                item.title || "",
+            url:
+                item.url || "",
+            description:
+                truncateCleanly(
+                    item.description || "",
+                    600
+                ),
+            discoveryKind:
+                item.discoveryKind || null,
+        }))
 } catch (error) {
     discoverySource =
         "homepage+search-error"
@@ -1741,7 +1780,7 @@ let extraUrls =
         )
 
 const productSearchEvidence =
-    searchPreview
+    searchResults
         .filter((item) => {
             const url =
                 item.url || ""
@@ -1755,11 +1794,22 @@ const productSearchEvidence =
 
             return isProductEvidenceUrl(
                 url,
-                siteType
+                siteType,
+                item.discoveryKind || null
             )
         })
         .slice(0, 10)
-
+        .map((item) => ({
+            title:
+                item.title || "",
+            url:
+                item.url || "",
+            description:
+                truncateCleanly(
+                    item.description || "",
+                    600
+                ),
+        }))
         if (
             productSearchEvidence.length > 0
         ) {
