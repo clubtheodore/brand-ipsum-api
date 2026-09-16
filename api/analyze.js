@@ -711,16 +711,6 @@ async function searchEvergreenPages(
     locale = "en-US",
     siteType = "other"
 ) {
-    let searchCountry = null
-
-    try {
-        searchCountry =
-            new Intl.Locale(locale)
-                .region || null
-    } catch {
-        searchCountry = null
-    }
-
     const brandHint =
         hostname
             .split(".")[0]
@@ -772,75 +762,77 @@ async function searchEvergreenPages(
                 : `${brandHint} brand story mission values`
     }
 
+    async function executeSearch(
+        searchQuery,
+        limit,
+        restrictDomain
+    ) {
+        const body = {
+            query: searchQuery,
+            sources: ["web"],
+            limit,
+            ignoreInvalidURLs: true,
+            timeout: 30000,
+        }
+
+        if (restrictDomain) {
+            body.includeDomains = [
+                hostname,
+            ]
+        }
+
+        const response = await fetch(
+            "https://api.firecrawl.dev/v2/search",
+            {
+                method: "POST",
+
+                headers: {
+                    Authorization:
+                        `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+                    "Content-Type":
+                        "application/json",
+                },
+
+                body:
+                    JSON.stringify(body),
+            }
+        )
+
+        const rawText =
+            await response.text()
+
+        let data = null
+
+        try {
+            data =
+                JSON.parse(rawText)
+        } catch {
+            throw new Error(
+                `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
+            )
+        }
+
+        if (
+            !response.ok ||
+            !data?.success
+        ) {
+            throw new Error(
+                data?.error ||
+                    `Firecrawl search failed (${response.status})`
+            )
+        }
+
+        return data.data?.web || []
+    }
+
     async function runSearch(
         query,
         limit
     ) {
-        async function executeSearch(
-            searchQuery,
-            restrictDomain
-        ) {
-            const body = {
-                query: searchQuery,
-                sources: ["web"],
-                limit,
-                ignoreInvalidURLs: true,
-                timeout: 30000,
-            }
-
-            if (restrictDomain) {
-                body.includeDomains = [
-                    hostname,
-                ]
-            }
-
-            const response = await fetch(
-                "https://api.firecrawl.dev/v2/search",
-                {
-                    method: "POST",
-
-                    headers: {
-                        Authorization:
-                            `Bearer ${process.env.FIRECRAWL_API_KEY}`,
-                        "Content-Type":
-                            "application/json",
-                    },
-
-                    body:
-                        JSON.stringify(body),
-                }
-            )
-
-            const rawText =
-                await response.text()
-
-            let data = null
-
-            try {
-                data =
-                    JSON.parse(rawText)
-            } catch {
-                throw new Error(
-                    `Firecrawl search returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
-                )
-            }
-
-            if (
-                !response.ok ||
-                !data?.success
-            ) {
-                throw new Error(
-                    data?.error ||
-                        `Firecrawl search failed (${response.status})`
-                )
-            }
-
-            return data.data?.web || []
-        }
-
         const directResults =
             await executeSearch(
                 query,
+                limit,
                 true
             )
 
@@ -851,6 +843,7 @@ async function searchEvergreenPages(
         const fallbackResults =
             await executeSearch(
                 `site:${hostname} ${query}`,
+                limit,
                 false
             )
 
@@ -862,6 +855,200 @@ async function searchEvergreenPages(
                     hostname
                 )
         )
+    }
+
+    async function runMapFallback() {
+        const response = await fetch(
+            "https://api.firecrawl.dev/v2/map",
+            {
+                method: "POST",
+
+                headers: {
+                    Authorization:
+                        `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+                    "Content-Type":
+                        "application/json",
+                },
+
+                body: JSON.stringify({
+                    url:
+                        `https://${hostname}`,
+                    sitemap: "include",
+                    includeSubdomains:
+                        false,
+                    ignoreQueryParameters:
+                        true,
+                    limit: 200,
+                    timeout: 30000,
+                }),
+            }
+        )
+
+        const rawText =
+            await response.text()
+
+        let data = null
+
+        try {
+            data =
+                JSON.parse(rawText)
+        } catch {
+            throw new Error(
+                `Firecrawl map returned invalid JSON (${response.status}): ${rawText.slice(0, 200)}`
+            )
+        }
+
+        if (
+            !response.ok ||
+            !data?.success
+        ) {
+            throw new Error(
+                data?.error ||
+                    `Firecrawl map failed (${response.status})`
+            )
+        }
+
+        const rejectedPatterns = [
+            "/resources/",
+            "/resource/",
+            "/careers/",
+            "/career/",
+            "/jobs/",
+            "/customers/",
+            "/customer/",
+            "/legal/",
+            "/privacy",
+            "/terms",
+            "/newsroom/",
+            "/news/",
+            "/sessions/",
+            "/session/",
+            "/guides/",
+            "/guide/",
+            "/use-cases/",
+            "/use-case/",
+            "/contact/",
+            "/blog/",
+            "/blogs/",
+            "/articles/",
+            "/article/",
+            "/support/",
+            "/help/",
+            "/docs/",
+            "/documentation/",
+            "/sitemap/",
+            "/lp/",
+            "/industries/",
+            "/payment-method/",
+        ]
+
+        const candidates =
+            (data.links || [])
+                .filter(
+                    (item) =>
+                        item?.url &&
+                        sameDomain(
+                            item.url,
+                            hostname
+                        )
+                )
+                .filter((item) => {
+                    let path = ""
+
+                    try {
+                        path =
+                            new URL(
+                                item.url
+                            ).pathname
+                                .toLowerCase()
+                    } catch {
+                        return false
+                    }
+
+                    return !rejectedPatterns.some(
+                        (pattern) =>
+                            path.includes(
+                                pattern
+                            )
+                    )
+                })
+                .map((item) => {
+                    const depth =
+                        getPathDepth(
+                            item.url
+                        )
+
+                    const title =
+                        String(
+                            item.title || ""
+                        ).trim()
+
+                    const titleLower =
+                        title.toLowerCase()
+
+                    const brandLower =
+                        brandHint.toLowerCase()
+
+                    let score = 0
+
+                    if (
+                        titleLower.startsWith(
+                            `${brandLower} `
+                        )
+                    ) {
+                        score += 40
+                    }
+
+                    if (
+                        titleLower.endsWith(
+                            `| ${brandLower}`
+                        )
+                    ) {
+                        score += 20
+                    }
+
+                    if (depth === 1) {
+                        score += 30
+                    } else if (depth === 2) {
+                        score += 15
+                    } else if (depth > 2) {
+                        score -= 20
+                    }
+
+                    const evergreen =
+                        scoreEvergreenUrl(
+                            item.url
+                        )
+
+                    if (
+                        evergreen.kind ===
+                        "offering"
+                    ) {
+                        score += 20
+                    }
+
+                    return {
+                        ...item,
+                        score,
+                    }
+                })
+                .filter(
+                    (item) =>
+                        item.score >= 30
+                )
+                .sort(
+                    (a, b) =>
+                        b.score -
+                        a.score
+                )
+                .slice(0, 10)
+                .map((item) => ({
+                    ...item,
+                    discoveryKind:
+                        "product",
+                }))
+
+        return candidates
     }
 
     const [
@@ -934,7 +1121,11 @@ async function searchEvergreenPages(
         merged.push(item)
     }
 
-    return merged
+    if (merged.length > 0) {
+        return merged
+    }
+
+    return runMapFallback()
 }
 
 async function scrapePage(
@@ -1591,7 +1782,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-38:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-39:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
