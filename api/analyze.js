@@ -2091,7 +2091,10 @@ let extraUrls =
             )
 
         let productEvidence = ""
-
+const productEvidenceDebug = {
+    pages: [],
+    search: [],
+}
         usableExtraPages.forEach(
             (page, index) => {
                 const pageIsProductEvidence =
@@ -2111,11 +2114,15 @@ let extraUrls =
                     )
 
                 if (
-                    pageIsProductEvidence
-                ) {
-                    productEvidence +=
-                        formattedPage
-                } else {
+    pageIsProductEvidence
+) {
+    productEvidenceDebug.pages.push(
+        page.url
+    )
+
+    productEvidence +=
+        formattedPage
+} else {
                     websiteContext +=
                         formattedPage
                 }
@@ -2135,11 +2142,23 @@ const productSearchEvidence =
                 return false
             }
 
-            return isProductEvidenceUrl(
-                url,
-                siteType,
-                item.discoveryKind || null
-            )
+            const isEvidence =
+    isProductEvidenceUrl(
+        url,
+        siteType,
+        item.discoveryKind || null
+    )
+
+if (isEvidence) {
+    productEvidenceDebug.search.push({
+        title: item.title || "",
+        url,
+        discoveryKind:
+            item.discoveryKind || null,
+    })
+}
+
+return isEvidence
         })
         .slice(0, 10)
         .map((item) => ({
@@ -2310,6 +2329,7 @@ SOURCE RULES:
     locale,
         siteType,
         siteTypeDebug,
+        productEvidenceDebug,
     pagesUsed,
 
         discovery: {
