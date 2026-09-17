@@ -497,25 +497,28 @@ function isProductEvidenceUrl(
             path.replace(/\/+$/, "")
 
         const rejectedSaasPaths = [
-            "/templates/",
-            "/template/",
-            "/marketplace/",
-            "/help/",
-            "/guides/",
-            "/blog/",
-            "/resources/",
-            "/resource-library/",
-            "/pricing",
-        ]
+    "/templates",
+    "/template",
+    "/marketplace",
+    "/help",
+    "/guides",
+    "/blog",
+    "/resources",
+    "/resource-library",
+    "/pricing",
+]
 
-        if (
-            rejectedSaasPaths.some(
-                (pattern) =>
-                    path.includes(pattern)
+if (
+    rejectedSaasPaths.some(
+        (pattern) =>
+            normalized === pattern ||
+            normalized.startsWith(
+                `${pattern}/`
             )
-        ) {
-            return false
-        }
+    )
+) {
+    return false
+}
 
         const segments =
             normalized
