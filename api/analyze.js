@@ -323,11 +323,20 @@ function inferSiteType(markdown, links = []) {
             pattern.test(path)
         ).length
 
-    let mediaScore =
+    const articleCount =
         count(
-            /\/(?:article|articles|news)\//i
-        ) * 3 +
-        count(/\/20\d{2}\//i) * 2 +
+            /\/(?:article|articles)\//i
+        )
+
+    const newsCount =
+        count(
+            /\/(?:news|newsroom)\//i
+        )
+
+    let mediaScore =
+        articleCount * 3 +
+        Math.min(newsCount, 2) +
+        count(/\/20\d{2}\//i) +
         count(
             /_\d{5,}_\d+\.html$/i
         ) * 3
@@ -341,7 +350,9 @@ function inferSiteType(markdown, links = []) {
         count(
             /\/(?:features?|pricing|integrations?|developers?|docs?|api|platform|solutions?)(?:\/|$)/i
         ) * 2 +
-        count(/\/product(?:\/|$)/i)
+        count(
+            /\/product(?:\/|$)/i
+        )
 
     const text =
         String(markdown || "")
@@ -361,15 +372,15 @@ function inferSiteType(markdown, links = []) {
             text
         )
     ) {
-        saasScore += 3
+        saasScore += 4
     }
 
     if (
-        /\b(journal|journalisme|news|article|reportage|chronique)\b/i.test(
+        /\b(journal|journalisme|journalism|newspaper|magazine|editorial|rédaction|reportage|chronique)\b/i.test(
             text
         )
     ) {
-        mediaScore += 3
+        mediaScore += 6
     }
 
     if (
@@ -1832,7 +1843,7 @@ const language =
         // On ne récupère donc jamais
         // les anciens résultats V2.
         const cacheKey =
-    `brand-ipsum:v3-43:${locale.toLowerCase()}:${hostname}`
+    `brand-ipsum:v3-44:${locale.toLowerCase()}:${hostname}`
 
         // --------------------------------
         // 1. CACHE REDIS
