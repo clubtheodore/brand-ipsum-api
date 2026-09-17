@@ -169,6 +169,7 @@ function scoreEvergreenUrl(url) {
         "/help/",
         "/resources/",
 "/resource/",
+        "/resource-library/",
 "/customer-service/",
         "/templates/",
 "/template/",
@@ -503,6 +504,7 @@ function isProductEvidenceUrl(
             "/guides/",
             "/blog/",
             "/resources/",
+            "/resource-library/",
             "/pricing",
         ]
 
@@ -975,6 +977,7 @@ async function searchEvergreenPages(
         const rejectedPatterns = [
             "/resources/",
             "/resource/",
+            "/resource-library/",
             "/careers/",
             "/career/",
             "/jobs/",
