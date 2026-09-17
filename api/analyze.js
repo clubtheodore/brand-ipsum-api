@@ -2238,6 +2238,7 @@ SOURCE RULES:
     hostname,
     language,
     locale,
+        siteType,
     pagesUsed,
 
         discovery: {
