@@ -296,8 +296,11 @@ if (
     }
 }
 
-function inferSiteType(markdown, links = []) {
-    const paths = links
+function inferSiteType(
+    markdown,
+    links = [],
+    debug = null
+) {    const paths = links
         .map((item) => {
             const url =
                 typeof item === "string"
@@ -382,7 +385,38 @@ function inferSiteType(markdown, links = []) {
     ) {
         mediaScore += 6
     }
+if (
+    debug &&
+    typeof debug === "object"
+) {
+    debug.mediaScore =
+        mediaScore
 
+    debug.saasScore =
+        saasScore
+
+    debug.ecommerceScore =
+        ecommerceScore
+
+    debug.articleCount =
+        articleCount
+
+    debug.newsCount =
+        newsCount
+
+    debug.datedUrlCount =
+        count(/\/20\d{2}\//i)
+
+    debug.mediaTextSignal =
+        /\b(journal|journalisme|journalism|newspaper|magazine|editorial|rédaction|reportage|chronique)\b/i.test(
+            text
+        )
+
+    debug.saasTextSignal =
+        /\b(api|workspace|workflow|software|platform|developer)\b/i.test(
+            text
+        )
+}
     if (
         mediaScore >= 8 &&
         mediaScore > ecommerceScore &&
@@ -1907,10 +1941,13 @@ const language =
                 "No usable homepage content found"
             )
         }
+const siteTypeDebug = {}
+
 const siteType =
     inferSiteType(
         homepage.markdown,
-        homepage.links
+        homepage.links,
+        siteTypeDebug
     )
         
         // --------------------------------
@@ -2250,6 +2287,7 @@ SOURCE RULES:
     language,
     locale,
         siteType,
+        siteTypeDebug,
     pagesUsed,
 
         discovery: {
