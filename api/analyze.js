@@ -378,13 +378,21 @@ function inferSiteType(
         saasScore += 4
     }
 
-    if (
-        /\b(journal|journalisme|journalism|newspaper|magazine|editorial|rédaction|reportage|chronique)\b/i.test(
-            text
-        )
-    ) {
-        mediaScore += 6
-    }
+    const strongMediaTextSignal =
+    /\b(journalisme|journalism|editorial|rédaction|reportage|chronique)\b/i.test(
+        text
+    )
+
+const weakMediaTextSignal =
+    /\b(journal|newspaper|magazine)\b/i.test(
+        text
+    )
+
+if (strongMediaTextSignal) {
+    mediaScore += 6
+} else if (weakMediaTextSignal) {
+    mediaScore += 2
+}
 if (
     debug &&
     typeof debug === "object"
@@ -408,9 +416,8 @@ if (
         count(/\/20\d{2}\//i)
 
     debug.mediaTextSignal =
-        /\b(journal|journalisme|journalism|newspaper|magazine|editorial|rédaction|reportage|chronique)\b/i.test(
-            text
-        )
+    strongMediaTextSignal ||
+    weakMediaTextSignal
     debug.mediaTextMatches =
     [
         ...new Set(
