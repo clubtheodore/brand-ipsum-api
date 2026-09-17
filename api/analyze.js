@@ -411,6 +411,18 @@ if (
         /\b(journal|journalisme|journalism|newspaper|magazine|editorial|rédaction|reportage|chronique)\b/i.test(
             text
         )
+    debug.mediaTextMatches =
+    [
+        ...new Set(
+            (
+                text.match(
+                    /\b(journal|journalisme|journalism|newspaper|magazine|editorial|rédaction|reportage|chronique)\b/gi
+                ) || []
+            ).map((value) =>
+                value.toLowerCase()
+            )
+        ),
+    ]
 
     debug.saasTextSignal =
         /\b(api|workspace|workflow|software|platform|developer)\b/i.test(
