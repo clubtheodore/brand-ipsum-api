@@ -299,9 +299,9 @@ if (
 
 function inferSiteType(
     markdown,
-    links = [],
-    debug = null
-) {    const paths = links
+    links = []
+) {    
+    const paths = links
         .map((item) => {
             const url =
                 typeof item === "string"
@@ -394,49 +394,7 @@ if (strongMediaTextSignal) {
 } else if (weakMediaTextSignal) {
     mediaScore += 2
 }
-if (
-    debug &&
-    typeof debug === "object"
-) {
-    debug.mediaScore =
-        mediaScore
 
-    debug.saasScore =
-        saasScore
-
-    debug.ecommerceScore =
-        ecommerceScore
-
-    debug.articleCount =
-        articleCount
-
-    debug.newsCount =
-        newsCount
-
-    debug.datedUrlCount =
-        count(/\/20\d{2}\//i)
-
-    debug.mediaTextSignal =
-    strongMediaTextSignal ||
-    weakMediaTextSignal
-    debug.mediaTextMatches =
-    [
-        ...new Set(
-            (
-                text.match(
-                    /\b(journal|journalisme|journalism|newspaper|magazine|editorial|rédaction|reportage|chronique)\b/gi
-                ) || []
-            ).map((value) =>
-                value.toLowerCase()
-            )
-        ),
-    ]
-
-    debug.saasTextSignal =
-        /\b(api|workspace|workflow|software|platform|developer)\b/i.test(
-            text
-        )
-}
     if (
         mediaScore >= 8 &&
         mediaScore > ecommerceScore &&
@@ -1118,33 +1076,7 @@ async function searchEvergreenPages(
                         "product",
                 }))
 
-console.log(
-    "MAP DEBUG",
-    JSON.stringify({
-        totalLinks:
-            Array.isArray(data.links)
-                ? data.links.length
-                : 0,
 
-        candidateCount:
-            candidates.length,
-
-        candidates:
-            candidates.map(
-                (item) => item.url
-            ),
-
-        sample:
-            (data.links || [])
-                .slice(0, 20)
-                .map((item) => ({
-                    url:
-                        item?.url || "",
-                    title:
-                        item?.title || "",
-                })),
-    })
-)
         
         return candidates
     }
@@ -1966,13 +1898,10 @@ const language =
                 "No usable homepage content found"
             )
         }
-const siteTypeDebug = {}
-
 const siteType =
     inferSiteType(
         homepage.markdown,
-        homepage.links,
-        siteTypeDebug
+        homepage.links
     )
         
         // --------------------------------
@@ -2094,10 +2023,7 @@ let extraUrls =
             )
 
         let productEvidence = ""
-const productEvidenceDebug = {
-    pages: [],
-    search: [],
-}
+
         usableExtraPages.forEach(
             (page, index) => {
                 const pageIsProductEvidence =
@@ -2119,9 +2045,7 @@ const productEvidenceDebug = {
                 if (
     pageIsProductEvidence
 ) {
-    productEvidenceDebug.pages.push(
-        page.url
-    )
+    
 
     productEvidence +=
         formattedPage
@@ -2145,23 +2069,11 @@ const productSearchEvidence =
                 return false
             }
 
-            const isEvidence =
-    isProductEvidenceUrl(
-        url,
-        siteType,
-        item.discoveryKind || null
-    )
-
-if (isEvidence) {
-    productEvidenceDebug.search.push({
-        title: item.title || "",
-        url,
-        discoveryKind:
-            item.discoveryKind || null,
-    })
-}
-
-return isEvidence
+            return isProductEvidenceUrl(
+    url,
+    siteType,
+    item.discoveryKind || null
+)
         })
         .slice(0, 10)
         .map((item) => ({
@@ -2331,8 +2243,6 @@ SOURCE RULES:
     language,
     locale,
         siteType,
-        siteTypeDebug,
-        productEvidenceDebug,
     pagesUsed,
 
         discovery: {
